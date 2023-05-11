@@ -3,29 +3,17 @@ import os, pandas as pd, numpy as np, tweepy, glob, re, advertools
 def user_download(api, user_list, group, folder, display='full'):
     """_summary_
     
-    Download users within Excel list of usernames and save in a csv under data
+    Download users within Excel list of usernames and save in a parquet under data
     _why_
     
     runs user_download_helper for each user to download tweets
-    removes csv files from user_list
     Args:
         Args input:
         api (tweepy class): Handles parsing Twitter API
         userID (list): twitter usernames
         group (string): label of users in list
     Args output:
-        csv file in data/{group}/{username}.csv
-        { 'id': 'int64',
-            'created_at': 'datetime64[ns, UTC]',
-            'url': 'object',
-            'favorite_count': 'int64',
-            'retweet_count': 'int64',
-            'hashtags':'object',
-            'emojis': 'object',
-            'emoji_text':'object',
-            'usernames': 'object',
-            'links': 'object',
-            'text': 'object'}
+        parquet file of users for each group
     """
     # Download every User from Group of User's
     for userID in user_list:
@@ -48,15 +36,6 @@ def user_download(api, user_list, group, folder, display='full'):
                   f"- Account Removed",
                   f"- Privated account",
                   f"*****", sep='\n', end='\n\n')
-    
-    ## if group folder exists
-    # if(os.path.exists(os.path.normpath(f'./data/users/{group}'))):
-        ## remove file if removed from excel spreadsheet
-        # csv_files = glob.glob(os.path.join(f'./data/users/{group}', "*.csv"))
-        # if(len(csv_files) > 0):
-        #     for file in csv_files:
-        #         if((str(file.split(os.sep)[-1].split(".")[0])) not in user_list):
-        #             os.remove(f'{file}')
 
 def user_download_helper(api, userID, group, file, folder, display):
     """_summary_
@@ -78,18 +57,7 @@ def user_download_helper(api, userID, group, file, folder, display):
                            [any other keystroke] -> prints only the group downloading
                            Default: 'full'
     Args output:
-        csv file in data/users/{group}/{username}.csv
-        { 'id': 'int64',
-            'created_at': 'datetime64[ns, US/Eastern]',
-            'url': 'object',
-            'favorite_count': 'int64',
-            'retweet_count': 'int64',
-            'hashtags':'object',
-            'emojis': 'object',
-            'emoji_text':'object',
-            'usernames': 'object',
-            'links': 'object',
-            'text': 'object'}
+        parquet file in data/users/{group}/{username}.parquet
     """
     
     # Check if there exists previous history of user and group
@@ -102,7 +70,7 @@ def user_download_helper(api, userID, group, file, folder, display):
             # df_history.dtypes({"created_at":"datetime64[ns, UTC]"})
             
         except Exception:
-            print("folder created without previous csv file")
+            print("folder created without previous file")
     else:
         oldest_id = None
     all_tweets = []
@@ -268,7 +236,7 @@ def twitter_authentication(autentication_path):
 
 def merge_files(folder, merge, group, display):
     """_summary_
-    Merge Individual groups of Twitter user's and save merge files as csv
+    Merge Individual groups of Twitter user's and save merge files as parquet
     _why_
     Args:
         group (_type_): _description_
@@ -325,7 +293,7 @@ def df_to_parquet(df, folder, file):
     Args:
         df (pandas): any pandas dataframe
         folder (string): folder location from source
-        file (string): file to name CSV file
+        file (string): file to name parquet file
     """
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -339,18 +307,6 @@ def dataframe_astypes():
     
     Returns:
         dictionary: column names and pandas dataframe conversions
-        
-        { 'id': 'int64',
-            'created_at': 'datetime64[ns, UTC]',
-            'url': 'object',
-            'favorite_count': 'int64',
-            'retweet_count': 'int64',
-            'hashtags':'object',
-            'emojis': 'object',
-            'emoji_text':'object',
-            'usernames': 'object',
-            'links': 'object',
-            'text': 'object'}
     """
     return { 'id': 'int64',
             'created_at': 'datetime64[ns, UTC]',

@@ -89,3 +89,51 @@ def mysql_execute(credentials, query, type='default', db=None):
         print(error)
     else:
         conn.close()
+        
+def mysql_connect(credentials, db):
+    try:
+        conn = mysql.connector.connect( user=credentials.user[0], password=credentials.password[0],
+                                                host = credentials.host[0],
+                                                port = int(credentials.port[0]),
+                                                db=db) 
+    except mysql.connector.errors as error:
+        print(error)
+    else:
+        conn.close()
+    return conn
+
+def dataframe_astypes():
+    """_summary_
+    
+    cleanly access dataframe conversions
+    
+    Returns:
+        dictionary: column names and pandas dataframe conversions
+        
+        { 'id': 'int64',
+            'created_at': 'datetime64[ns, UTC]',
+            'user':'object',
+            'group':'object',
+            'url': 'object',
+            'favorite_count': 'int64',
+            'retweet_count': 'int64',
+            'hashtags':'object',
+            'emojis': 'object',
+            'emoji_text':'object',
+            'usernames': 'object',
+            'links': 'object',
+            'text': 'object'}
+    """
+    return { 'id': 'int64',
+            'created_at': 'datetime64[ns, UTC]',
+            'user':'object',
+            'group':'object',
+            'url': 'object',
+            'favorite_count': 'int64',
+            'retweet_count': 'int64',
+            'hashtags':'object',
+            'emojis': 'object',
+            'emoji_text':'object',
+            'usernames': 'object',
+            'links': 'object',
+            'text': 'object'}
