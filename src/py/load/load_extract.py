@@ -62,47 +62,92 @@ if(verification == True):
     # Read in Raw Tweets
     twitter_df = pd.read_parquet('./data/extracted/merged/all_twitter.parquet').astype(dataframe_astypes())
     
-    # Rename schema for MYSQL
+    # Simplify the dataframe for test purposes
+    twitter_df = twitter_df.iloc[0:100, :]
+    
+    # Rename dataframe schema for MYSQL
     twitter_df.rename(columns = {"id":"twitter_id",
                                  "user":"twitter_user",
                                  "group":"twitter_group",
                                  "url":"tweet_url",
                                  "links":"all_urls",
-                                 "text":"raw_text"},
+                                 "text":"raw_text",
+                                 "usernames":"mentioned_users"},
                       inplace = True)
-
-    fact_table = "rawtweets_fact"
-    user_table = "user_dim"
-    date_table = "date_dim"
     
-    date_df = pd.DataFrame()
-    date_df['timestamp'] = twitter_df.created_at.dt.tz_convert('UTC')
-    date_df["date"] = date_df.timestamp.dt.date
-    date_df["time"] = date_df.timestamp.dt.time
-    date_df["year"] = date_df.timestamp.dt.year
-    date_df["month"] = date_df.timestamp.dt.month
-    date_df["day"] = date_df.timestamp.dt.day
-    date_df["hour"] = date_df.timestamp.dt.hour
-    date_df["minute"] = date_df.timestamp.dt.minute
-    date_df["second"] = date_df.timestamp.dt.second
-    date_df["timezone"] = date_df.timestamp.dt.tz
-    twitter_df.to_sql(name=date_table,
+    
+    Q1 = """CREATE TABLE 
+    
+    """
+    
+    # Create Date Dimension Table
+    date_table = "date_dim"
+    date_df = timestamp_split_df(pd.Series(twitter_df.created_at))
+    date_df.to_sql(name=date_table,
                       con=engine, 
                       if_exists = 'replace', 
                       index=False,
-                      chunksize=5000, 
+                      chunksize=10000, 
                       method='multi')
     with engine.connect() as con:
-        con.execute(f'ALTER TABLE {date_table} ADD PRIMARY KEY (id);')
-        
-    # ALTER TABLE {date_table} ADD FOREIGN KEY (PersonID) REFERENCES Persons(PersonID)
-        
-    # # Insert df into table
-    # twitter_df.to_sql(name=table,
-    #                   con=engine, 
-    #                   if_exists = 'replace', 
-    #                   index=False,
-    #                   chunksize=5000, 
-    #                   method='multi')
+        con.execute(f'ALTER TABLE {date_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST')
     
+    # Create user Dimension Table
+    user_table = "user_dim"
+    user_df = twitter_df.loc[:, ["twitter_user", "twitter_group", "mentioned_users"]]
+    user_df.to_sql( name=user_table,
+                    con=engine, 
+                    if_exists = 'replace', 
+                    index=False,
+                    chunksize=10000, 
+                    method='multi')
+    with engine.connect() as con:
+        con.execute(f'ALTER TABLE {user_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST')
+
+    # Create Fact Table Last...
+    fact_table = "rawtweets_fact"
+    fact_df = twitter_df.loc[:, ["twitter_id", 'raw_text', "tweet_url", "favorite_count", "retweet_count", 'hashtags', 'emojis', 'emoji_text', 'all_urls']]
+    
+    create_sql_table = f"""CREATE TABLE {fact_table} (
+                        ID INT,
+                        DateID_FK INT,
+                        twitter_id bigint,
+                        raw_text text,
+                        tweet_url text
+                        favorite_count bigint,
+                        retweet_count bigint,
+                        hashtags text,
+                        emojis text,
+                        emoji_text text,
+                        all_urls text,
+                        PRIMARY KEY (ID),
+                        FOREIGN KEY (DateID_FK) REFERENCES {date_table} (ID));
+                        """
+    engine.execute(create_sql_table)
+    
+    fact_df.to_sql( name=fact_table,
+                    con=engine, 
+                    if_exists = 'replace', 
+                    index=False,
+                    chunksize=10000,
+                    method='multi')
+    # %%
+    with engine.connect() as con:
+        # Create primary key
+        con.execute(f"""ALTER TABLE {fact_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST;""")
+        # Create Foreign key
+        con.execute(f"""ALTER TABLE {fact_table} ADD DateID_FK int NOT NULL;""")
+        con.execute(f"""REPLACE INTO {fact_table}(DateID_FK)
+                    SELECT ID FROM {date_table};""") 
+        # Link Foreign Key
+        sql = f"""ALTER TABLE {fact_table}
+                ADD CONSTRAINT DateID_FK_Constraint
+                FOREIGN KEY (DateID_FK) REFERENCES {date_table}(ID) 
+                ON  update cascade;"""
+        con.execute(sql)
+        
+        # con.execute(f'ALTER TABLE {fact_table} ADD UserID int NOT NULL AUTO_INCREMENT FOREIGN KEY REFERENCES {user_table}(ID)')
+    
+twitter_df.head()
 # %%
+

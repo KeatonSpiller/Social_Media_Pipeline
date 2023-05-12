@@ -102,6 +102,28 @@ def mysql_connect(credentials, db):
         conn.close()
     return conn
 
+def timestamp_split_df(dt64):
+    """split of the individual date time components of timestamp
+
+    Args:
+        dt64 (datetime64): Datetime64[ns, UTC] nanosecond timestamp of (Universal Time Coordinated) time zone
+
+    Returns:
+        pd.DataFrame: timestamp, timezone, date, time, year, month, day, hour, minute, second
+    """
+    date_df = pd.DataFrame()
+    date_df['timestamp'] = dt64.dt.tz_convert('UTC')
+    date_df["timezone"] = str(date_df.timestamp.dt.tz)
+    date_df["date"] = date_df.timestamp.dt.date
+    date_df["time"] = date_df.timestamp.dt.time
+    date_df["year"] = date_df.timestamp.dt.year
+    date_df["month"] = date_df.timestamp.dt.month
+    date_df["day"] = date_df.timestamp.dt.day
+    date_df["hour"] = date_df.timestamp.dt.hour
+    date_df["minute"] = date_df.timestamp.dt.minute
+    date_df["second"] = date_df.timestamp.dt.second
+    return date_df
+
 def dataframe_astypes():
     """_summary_
     
@@ -109,20 +131,6 @@ def dataframe_astypes():
     
     Returns:
         dictionary: column names and pandas dataframe conversions
-        
-        { 'id': 'int64',
-            'created_at': 'datetime64[ns, UTC]',
-            'user':'object',
-            'group':'object',
-            'url': 'object',
-            'favorite_count': 'int64',
-            'retweet_count': 'int64',
-            'hashtags':'object',
-            'emojis': 'object',
-            'emoji_text':'object',
-            'usernames': 'object',
-            'links': 'object',
-            'text': 'object'}
     """
     return { 'id': 'int64',
             'created_at': 'datetime64[ns, UTC]',
