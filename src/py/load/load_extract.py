@@ -75,26 +75,12 @@ if(verification == True):
                                  "usernames":"mentioned_users"},
                       inplace = True)
     
-    
-    Q1 = """CREATE TABLE 
-    
-    """
-    
-    # Create Date Dimension Table
-    date_table = "date_dim"
-    date_df = timestamp_split_df(pd.Series(twitter_df.created_at))
-    date_df.to_sql(name=date_table,
-                      con=engine, 
-                      if_exists = 'replace', 
-                      index=False,
-                      chunksize=10000, 
-                      method='multi')
-    with engine.connect() as con:
-        con.execute(f'ALTER TABLE {date_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST')
-    
+    # %%
     # Create user Dimension Table
+    # - Organize by unique user's and Distinct mentions of users
     user_table = "user_dim"
-    user_df = twitter_df.loc[:, ["twitter_user", "twitter_group", "mentioned_users"]]
+    user_df = twitter_df.loc[:, ["twitter_user", "twitter_group", "mentioned_users"]].fillna("")
+    user_df=user_df.groupby(["twitter_user", "twitter_group"]).agg({'mentioned_users': lambda x: " ".join(set(x))}).reset_index()
     user_df.to_sql( name=user_table,
                     con=engine, 
                     if_exists = 'replace', 
@@ -103,51 +89,62 @@ if(verification == True):
                     method='multi')
     with engine.connect() as con:
         con.execute(f'ALTER TABLE {user_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST')
-
+    # %%
+     # Create Date Dimension Table
+    # - Organize by User's that tweeted on the same date
+    date_table = "date_dim"
+    date_df = timestamp_split_df(pd.Series(twitter_df.created_at))
+    date_df.insert(0, 'twitter_id', twitter_df.twitter_id)
+    print(date_df)
+    date_df.to_sql(name=date_table,
+                      con=engine, 
+                      if_exists = 'replace', 
+                      index=False,
+                      chunksize=10000, 
+                      method='multi')
+    with engine.connect() as con:
+        con.execute(f'ALTER TABLE {date_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST')
+        
+    # %%
     # Create Fact Table Last...
     fact_table = "rawtweets_fact"
     fact_df = twitter_df.loc[:, ["twitter_id", 'raw_text', "tweet_url", "favorite_count", "retweet_count", 'hashtags', 'emojis', 'emoji_text', 'all_urls']]
-    
-    create_sql_table = f"""CREATE TABLE {fact_table} (
-                        ID INT,
-                        DateID_FK INT,
+        
+    # Drop Previous Table
+    with engine.connect() as con:
+        con.execute(f'DROP TABLEIF EXISTS {fact_table} ')
+    # %%
+    # Create Schema for Fact Table
+    create_sql_table = f"""CREATE TABLE IF NOT EXISTS {fact_table} (
+                        ID INT PRIMARY KEY AUTO_INCREMENT,
+                        UserID_FK INT,
                         twitter_id bigint,
                         raw_text text,
-                        tweet_url text
+                        tweet_url text,
                         favorite_count bigint,
                         retweet_count bigint,
                         hashtags text,
                         emojis text,
                         emoji_text text,
                         all_urls text,
-                        PRIMARY KEY (ID),
-                        FOREIGN KEY (DateID_FK) REFERENCES {date_table} (ID));
+                        FOREIGN KEY (UserID_FK) REFERENCES {user_table}(ID));
                         """
     engine.execute(create_sql_table)
     
+    # Read in Dimension Tables to extract foreign keys to associate with the fact table
+    with engine.connect() as con:
+        readin_date_df = pd.read_sql_table(f'{date_table}', con)
+        readin_user_df = pd.read_sql_table(f'{user_table}', con)
+    user_merge = pd.merge(twitter_df, readin_user_df, how='left', on=["twitter_user"])
+    fact_df.insert(0,'userID_FK',user_merge.ID)
+    date_merge = pd.merge(twitter_df, readin_date_df, how='left', on=['twitter_id'])
+    fact_df.insert(0, 'ID', date_merge.ID)
+    
     fact_df.to_sql( name=fact_table,
-                    con=engine, 
-                    if_exists = 'replace', 
+                    con=engine,
+                    if_exists = 'append', 
                     index=False,
                     chunksize=10000,
-                    method='multi')
-    # %%
-    with engine.connect() as con:
-        # Create primary key
-        con.execute(f"""ALTER TABLE {fact_table} ADD ID int NOT NULL AUTO_INCREMENT primary key FIRST;""")
-        # Create Foreign key
-        con.execute(f"""ALTER TABLE {fact_table} ADD DateID_FK int NOT NULL;""")
-        con.execute(f"""REPLACE INTO {fact_table}(DateID_FK)
-                    SELECT ID FROM {date_table};""") 
-        # Link Foreign Key
-        sql = f"""ALTER TABLE {fact_table}
-                ADD CONSTRAINT DateID_FK_Constraint
-                FOREIGN KEY (DateID_FK) REFERENCES {date_table}(ID) 
-                ON  update cascade;"""
-        con.execute(sql)
-        
-        # con.execute(f'ALTER TABLE {fact_table} ADD UserID int NOT NULL AUTO_INCREMENT FOREIGN KEY REFERENCES {user_table}(ID)')
-    
-twitter_df.head()
+                    method='multi') 
 # %%
 
