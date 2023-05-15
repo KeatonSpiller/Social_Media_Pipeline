@@ -112,7 +112,7 @@ if(verification == True):
         
     # Drop Previous Table
     with engine.connect() as con:
-        con.execute(f'DROP TABLEIF EXISTS {fact_table} ')
+        con.execute(f'DROP TABLE IF EXISTS {fact_table} ')
     # %%
     # Create Schema for Fact Table
     create_sql_table = f"""CREATE TABLE IF NOT EXISTS {fact_table} (
