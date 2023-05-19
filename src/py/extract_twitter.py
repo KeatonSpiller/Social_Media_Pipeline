@@ -7,7 +7,7 @@
 
 # %% [markdown]
 ## Import Libraries
-import os, pandas as pd
+import os, pandas as pd, openpyxl
 
 # %% [markdown]
 # - Change Directory to top level folder
@@ -27,7 +27,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
   
 # %% [markdown]
 ## Load Custom Functions
-from src.py.extract.twitter_tools import user_download, twitter_authentication, merge_tweets
+from twitter_tools import user_download, twitter_authentication, merge_tweets
 
 # %% [markdown]
 # # Twitter API Credentials
@@ -39,7 +39,7 @@ api = twitter_authentication(autentication_path)
 # # Load Twitter Usernames   
 # * Accounts may be privated or removed and change ability to download
 # * No two users can have the same id
-with open(os.path.normpath(os.getcwd() + './user_input/twitter_users.xlsx'), 'rb') as f:
+with open(os.path.normpath(os.getcwd() + '/user_input/twitter_users.xlsx'), 'rb') as f:
     user_df = pd.read_excel(f, sheet_name='user_names')
     user_df = user_df.where(pd.notnull(user_df), '')
     f.close()

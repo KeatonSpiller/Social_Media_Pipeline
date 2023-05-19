@@ -21,7 +21,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
         
 # %%
 # Import Local Scripts
-from src.py.load.load_tools import create_credentials, argon_hash, verify_password, mysql_execute, mysql_connect,  timestamp_split_df, dataframe_astypes    
+from py.load_tools import create_credentials, argon_hash, verify_password, mysql_execute, mysql_connect,  timestamp_split_df, dataframe_astypes    
         
 # %%
 # Access Root credentials?
@@ -81,9 +81,10 @@ if(verification == True):
     user_df=user_df.groupby(["twitter_user", "twitter_group"]).agg({'mentioned_users': lambda x: " ".join(set(x))}).reset_index()
     create_user_table = f"""CREATE TABLE IF NOT EXISTS {user_table} (
                         ID INT PRIMARY KEY AUTO_INCREMENT,
-                        twitter_user text,
+                        twitter_user varchar(200),
                         twitter_group text,
-                        mentioned_users text);
+                        mentioned_users text,
+                        CONSTRAINT no_duplicates UNIQUE (ID,twitter_user));
                         """
     engine.execute(create_user_table)
     user_df.to_sql( name=user_table,
@@ -109,7 +110,8 @@ if(verification == True):
                         day int,
                         hour int,
                         minute int,
-                        second int);
+                        second int,
+                        CONSTRAINT no_duplicates UNIQUE (ID,twitter_id));
                         """
     engine.execute(create_date_table)
     date_df.to_sql(name=date_table,
@@ -137,7 +139,8 @@ if(verification == True):
                         emojis text,
                         emoji_text text,
                         all_urls text,
-                        FOREIGN KEY (UserID_FK) REFERENCES {user_table}(ID));
+                        FOREIGN KEY (UserID_FK) REFERENCES {user_table}(ID),
+                        CONSTRAINT no_duplicates UNIQUE (ID,twitter_id));
                         """
     engine.execute(create_sql_table)
     

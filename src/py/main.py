@@ -1,7 +1,6 @@
 # %%
 # Import libraries
-import subprocess, os, sys
-from collections import Counter
+import os, sys
             
 class socialmedia():
     # - Change Directory to top level folder
@@ -21,17 +20,11 @@ class socialmedia():
         except Exception as e:
             print(f"cwd: {os.getcwd()}", sep = '\n')
             print(f"{e}\n:Please start current working directory from {top_level_folder}")
-    # def remove_duplicate_paths(paths):
-    #     d = dict(Counter(paths))
-    #     for i in paths:
-    #         if(d[i]>1):
-    #             paths.remove(i)
-    # remove_duplicate_paths(sys.path)
     
     # extract
-    from src.py.extract import extract_twitter
+    import extract_twitter
     # load
-    from src.py.load import load_extract
+    # import load_extract
 # %%
 def main():
     app = socialmedia()
