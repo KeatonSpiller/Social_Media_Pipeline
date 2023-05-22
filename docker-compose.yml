@@ -1,0 +1,36 @@
+services:
+  mysql:
+    build: ./src/sql/
+    restart: always
+    container_name: mysql_container
+    environment:
+      MYSQL_DATABASE: 'socialmedia'
+      MYSQL_ROOT_PASSWORD: '!0okm1qaz!'
+    ports:
+      - 3307:3306
+
+  pythonapp:
+    build: 
+      context: .
+      dockerfile: ./src/py/Dockerfile
+    image: py_image
+    container_name: py_container
+    links:
+      - "mysql"
+    depends_on:
+      - mysql
+    stdin_open: true # docker run -i ( interactive: Keep STDIN open even if not attached )
+    tty: true        # docker run -t ( Allocate a pseudo-TTY )
+
+# -----build both SQL and python Docker files-----
+# docker compose up
+
+# -----remove images-----
+# docker system prune
+# ----prune images and containers----
+# docker image prune -a
+# ----Remove images, containers, and volumes----
+# docker system prune -a --volumes
+
+# execute MYSQL
+#  docker exec -it mysql_container sql -p

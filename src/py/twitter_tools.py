@@ -28,8 +28,7 @@ def user_download(api, user_list, group, folder, display='full'):
                                  folder=folder, 
                                  display=display)
         except Exception as e:
-            if(display != 'minimal' and display != 'full'):
-                print(userID, end = ' ')
+            print(f"\n{userID}", end = ' ')
             print(f"exception: {str(e)}",
                   f"Scenarios could include",
                   f"- Mispelled User ID",
@@ -59,11 +58,11 @@ def user_download_helper(api, userID, group, file, folder, display):
     Args output:
         parquet file in data/users/{group}/{username}.parquet
     """
-    
+    first_time_dowloading = False
     # Check if there exists previous history of user and group
     if os.path.exists(file):
         try:
-            df_history = pd.read_parquet(file, ).reset_index(drop=True)
+            df_history = pd.read_parquet(file).reset_index(drop=True)
             oldest_id = df_history.id.min()
             since_id = df_history.id.max()
             df_history.created_at = pd.to_datetime(df_history.created_at)
@@ -78,6 +77,7 @@ def user_download_helper(api, userID, group, file, folder, display):
     # If first time running
     #################################################
     if(oldest_id == None): 
+        first_time_dowloading = True
         tweets = api.user_timeline(screen_name=userID, 
                                 count=200,
                                 include_rts = False,
@@ -185,11 +185,8 @@ def user_download_helper(api, userID, group, file, folder, display):
         # If no previous folder then create folder
         if not os.path.exists(folder):
             os.makedirs(folder)
-        # If no previous history then create file
-        if not os.path.exists(file):
-            df_temp.to_parquet(file,index=False)
-        # else merge previous history
-        else:
+        # If previous history then merge previous history
+        if os.path.exists(file):
             df_merge = pd.concat([df_temp, df_history],
                                 axis = 0,
                                 join = 'outer',
@@ -198,18 +195,21 @@ def user_download_helper(api, userID, group, file, folder, display):
                                         'usernames','links','text'],
                                 ignore_index=True)
             df_merge.to_parquet(file,index=False)
+        # else create file
+        else:
+            df_temp.to_parquet(file,index=False)
+            
             
         # print size of download
         if(display == 'full'):
             # if first time downloading
-            if(oldest_id == None):
-                print(f'-> {len(df_merge)} tweets downloaded', end='\n')
-            # else added tweets are not empty
-            else: 
+            if(first_time_dowloading == True):
+                print(f'-> {len(df_temp)} tweets downloaded', end='\n')
+            else:
                 print(f'-> {len(df_temp)} tweets downloaded, {len(df_merge)} total tweets', end='\n') 
     #################################################
     else:
-        # len() of downloaded file was 0
+        # len() of downloaded file is 0
         if(display == 'full'):
             print(f"-> [no recent tweets]",end='\n')    
                     

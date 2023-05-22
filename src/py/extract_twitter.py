@@ -66,5 +66,5 @@ print('Twitter user download complete')
 # %%
 # Merge all Tweets Together
 all_tweets_df = merge_tweets(twitter_groups)
-print(f"size of  tweets file: {all_tweets_df.shape}")
+print(f"size of merged tweets file: {all_tweets_df.shape}")
 # %%

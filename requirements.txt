@@ -9,3 +9,4 @@ regex == 2021.8.28
 tweepy == 4.12.1
 glob2 == 0.7
 openpyxl==3.0.10
+flask==2.3.2

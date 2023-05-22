@@ -2,13 +2,13 @@ import argon2, pandas as pd, getpass, mysql.connector
 
 def create_credentials(file):
     # Ask for credentials and store as a parquet file
-    create_credentials = input("Create Root Credentials?\nY/N: ")
+    create_credentials = input("Store Root Credentials?\nY/N: ")
     if(create_credentials in ["Y","y","yes","Yes", "YES"]):
         # Ask for Credentials
         user,password,host,port = str(input("user: ")), str(getpass.getpass("password: ")), str(input("host: ")), str(input("port: "))
-        hashed_password = argon_hash(password)
+        # hashed_password = argon_hash(password)
         # Store as DataFrame
-        cred_df = pd.DataFrame( data = {"user": [user],"password": [hashed_password],"host": [host],"port": [port]},
+        cred_df = pd.DataFrame( data = {"user": [user],"password": [password],"host": [host],"port": [port]},
                                 columns= ['user','password','host', 'port'])
         # Convert to pyarrow
         cred_df.astype({"user":"string[pyarrow]",
