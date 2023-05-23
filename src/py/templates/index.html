@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+    <body style="background-color:#d9dee0;">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Twitter ETL</title>
+        <style>
+        #content {
+            background-color: #ddd;
+            border-radius: 8px;
+            padding: 1em;
+        }
+        </style>
+        <center>
+        <h1>Social Media Pipeline </h1>
+        </center>
+    </head>
+
+    <body>
+        <h1>Twitter</h1>
+        <h3>Upload Twitter User Handles (.xlsx)</h3>
+        <form  action="/upload" method="post" enctype="multipart/form-data">
+            <center>
+            <input 
+            type="file"
+            name="file"
+            style="background: rgba(239, 239, 240, 1);color:rgb(0, 0, 0);"
+            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+
+            <input 
+            type="submit"
+            style="background: rgb(0, 83, 139);color:white;"
+            value="Upload">
+            </center>
+
+        </form>
+    </body>
+
+    <center>
+        &nbsp;
+        <body>
+            <form action="/etl" method ="post">
+
+                <button 
+                type="submit"
+                onclick="toggle();"
+                style="background: rgb(0, 83, 139);color:white;"  
+                name="extract" 
+                value="extract"> Extract </button>
+                <h3></h3>
+                <button 
+                type="submit"
+                onclick="toggle();"
+                style="background: rgb(63, 0, 139);color:white;"  
+                name="transform" 
+                value="transform"> Transform </button>
+
+            </form> 
+        </body>
+    </center>
+</html>
+
+

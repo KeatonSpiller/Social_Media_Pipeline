@@ -3,6 +3,7 @@
 import os, sys, pandas as pd
 from flask import Flask, render_template, request
 from fileinput import filename
+from werkzeug.utils import secure_filename
 
 def main():
     # %%            
@@ -23,37 +24,50 @@ def main():
         except Exception as e:
             print(f"cwd: {os.getcwd()}", sep = '\n')
             print(f"{e}\n:Please start current working directory from {top_level_folder}")
-
+    
     app = Flask(__name__)
+    @app.route("/")
+    @app.route("/home")
+    def home():
+        return render_template("index.html")
     
-    # Root endpoint
-    @app.get('/')
+    @app.route("/upload", methods=["POST"])
     def upload():
-        return render_template('upload-excel.html')
-    
-    
-    @app.post('/view')
-    def view():
     
         # Read the File using Flask request
         file = request.files['file']
-        # save file in local directory
-        file.save('./user_input/' + file.filename)
-        print(file)
-        print(filename)
-        print('./user_input/' + file.filename)
-        # Parse the data as a Pandas DataFrame type
-        data = pd.read_excel(file)
     
+        # save file in local directory
+        UPLOAD_FOLDER = os.path.normpath('./user_input')
+        if(not os.path.exists(UPLOAD_FOLDER)):
+            os.mkdir(UPLOAD_FOLDER)
+        app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+        
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+        
+        # Parse the data as a Pandas DataFrame type
+        # data = pd.read_excel(file)
         # Return HTML snippet that will render the table
-        return data.to_html()
+        # return data.to_html()
+        
+        return render_template("index.html") 
+    
+    @app.route("/etl", methods=["POST"])
+    def etl():
+        if(request.method == 'POST'):
+            data = request.form
+            if 'extract' in data:
+                print("Extract")
+                import extract_twitter
+                print("load to MYSQL")
+                import load_extract
+            elif 'transform' in data:
+                print("Transform")
+            else:
+                print("neither") # unknown
+        return render_template("index.html") 
 
-    app.run(port=5001, debug=True)
-
-    # extract
-    # import extract_twitter
-    # load
-    # import load_extract
+    app.run(port=5000, debug=True)
 
 if __name__ == '__main__':
     main()
