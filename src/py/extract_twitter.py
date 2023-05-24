@@ -27,7 +27,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
   
 # %% [markdown]
 ## Load Custom Functions
-from twitter_tools import user_download, twitter_authentication, merge_tweets
+from extract_tools import user_download, twitter_authentication, merge_tweets
 
 # %% [markdown]
 # # Twitter API Credentials
@@ -44,7 +44,6 @@ with open(os.path.normpath(os.getcwd() + '/user_input/twitter_users.xlsx'), 'rb'
     user_df = user_df.where(pd.notnull(user_df), '')
     f.close()
 twitter_groups = list(user_df.columns)
-user_df
          
 # %% [markdown]
 # ## Download Tweets

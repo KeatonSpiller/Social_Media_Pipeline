@@ -3,10 +3,9 @@
 import os, sys, pandas as pd
 from flask import Flask, render_template, request
 from fileinput import filename
-from werkzeug.utils import secure_filename
 
-def main():
-    # %%            
+# %%
+def main():            
     # - Change Directory to top level folder
     top_level_folder = 'Social_Media_Pipeline'
     if(os.getcwd().split(os.sep)[-1] != top_level_folder):
@@ -63,11 +62,14 @@ def main():
                 import load_extract
             elif 'transform' in data:
                 print("Transform")
+                import transform
             else:
                 print("neither") # unknown
         return render_template("index.html") 
 
     app.run(port=5000, debug=True)
 
+# %%
 if __name__ == '__main__':
     main()
+# %%

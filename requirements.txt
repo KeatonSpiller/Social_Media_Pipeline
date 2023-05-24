@@ -10,3 +10,16 @@ tweepy == 4.12.1
 glob2 == 0.7
 openpyxl==3.0.10
 flask==2.3.2
+nltk== 3.6.2
+gensim==3.8.3
+texthero==1.1.0 # uses gensim
+emoji==2.2.0
+# easyNMT==2.0.2
+
+# Double check the easyNMT package
+# https://pypi.org/project/EasyNMT/
+#https://github.com/bentoml/BentoML/discussions/1432 (nltk download)
+
+# remove virtual environment
+# deactivate
+# rm -r venv
