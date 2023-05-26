@@ -4,7 +4,7 @@
 import os, glob, pandas as pd, numpy as np, re, texthero, collections, itertools, emoji, math
 from nltk.util import ngrams,everygrams,skipgrams
 from nltk.stem.snowball import SnowballStemmer
-from easynmt import EasyNMT, models
+# from easynmt import EasyNMT, models
     
 def dataframe_astypes():
     """_summary_
@@ -83,6 +83,7 @@ def clean_text(s, words_to_remove):
         s (Pandas Series): Series of strings to clean
         words_to_remove (list): list of words to remove
     """
+    print(f"Cleaning Text:\n")
     # normalize to lowercase
     s = s.str.lower()
     
@@ -119,7 +120,7 @@ def clean_text(s, words_to_remove):
     # If I wish to filter frequency
     # filter out infrequent ( words used 1 or 2 times )
     # filter out frequent ( words used more than 1000 times?)
-    
+    print(f"Finished Cleaning Text:\n")
     return stemmed, s
 
 def relative_probability(relative_frequency, cleaned_text):

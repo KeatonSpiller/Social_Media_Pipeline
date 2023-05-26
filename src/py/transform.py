@@ -76,6 +76,7 @@ df_to_parquet(df = cleaned_df,
 # wv = KeyedVectors.load("word2vec.wordvectors", mmap='r')
 
 # %% [markdown]
+
 # - cluster similar words
 # - kmeans | PCA | fuzzycmeans | tsne
 # fuzzy_c = skfda.ml.clustering.FuzzyCMeans(random_state=0)
@@ -84,22 +85,25 @@ df_to_parquet(df = cleaned_df,
 # %% [markdown]
 # - Generate N gram, frequency, and relative frequency
 # - Note: Avoided N gram probability matrix -> ran into memory constraints
+print(f"Extracting ngram Sentences:\n")
 unigram_sentence, unigram_frequency, unigram_relative_frequency = n_gram(cleaned_stem_text, 1)
 bigram_sentence, bigram_frequency, bigram_relative_frequency = n_gram(cleaned_stem_text, 2)
 trigram_sentence, trigram_frequency, trigram_relative_frequency = n_gram(cleaned_stem_text, 3)
 quadgram_sentence, quadgram_frequency, quadgram_relative_frequency = n_gram(cleaned_stem_text, 4)
 pentagram_sentence, pentagram_frequency, pentagram_relative_frequency = n_gram(cleaned_stem_text, 5)
-
+print(f"Finished ngram Extraction:\n")
 # %% [markdown]
-# N Gram probabilities (~ 30 minutes)
+# N Gram probabilities (~ 30 minutes) -> [To improve could apply laplase Smoothing] / [skipgrams]
 # $$ Unigram = P(W_{1:n})= \prod_{k=1}^n P(W_{k}) $$
 # $$ Bigram = P(W_{1:n})\approx\prod_{k=1}^n P(W_{k}|W_{k-1}) $$
 # $$ P(W_{n}|W_{n-1}) =  \dfrac{Count(W_{n-1}W{n})}{Count(W{n-1})} $$
 # $$ Trigram = P(W_{1:n})\approx\prod_{k=1}^n P(W_{k}|W_{{k-2}, W_{k-1}}) $$
-# - To improve could apply laplase Smoothing / skipgrams 
+print(f"Calculating Unigram Probability:\n")
 unigram_prob = unigram_probability(cleaned_stem_text, unigram_relative_frequency)
+print(f"Finished Unigram Probability:\n")
+print(f"Calculating Bigram Probability:\n")
 bigram_prob = bigram_probability(cleaned_stem_text, bigram_sentence, unigram_frequency, bigram_frequency)
-
+print(f"Finished Bigram Probability:\n")
 # %% [markdown]
 # - Combine ngram probability and cleaned text variations to dataframe
 cleaned_df_ngram = cleaned_df.copy()
