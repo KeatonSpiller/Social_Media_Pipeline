@@ -92,8 +92,11 @@ def clean_text(s, words_to_remove):
     s = s.str.replace(regex, "", regex=True)
     
     # remove stop words
-    s = s.str.replace(r'(?<!\w)(?:' +'|'.join(words_to_remove) + r')(?!\w)', "", regex=True)
     
+    # regex_remove = r"(?<!\w)(?:" + '|'.join(words_to_remove) + r")(?!\w)"
+    or_words = '|'.join(words_to_remove)
+    regex_remove = f"\b({or_words})\b"
+    s = s.str.replace(regex_remove, "", regex=True)
     # replace emoji
     s = s.apply(lambda s: emoji.replace_emoji(s, ''))
     
@@ -181,10 +184,9 @@ def n_gram(cleaned_text, n):
     grams = pd.Series(cleaned_text.apply(lambda tweet: list(ngrams(tweet, n))))
     frequency = pd.Series(collections.Counter(list(itertools.chain.from_iterable(grams))))
     relative_frequency = frequency / len(frequency)
-    
     folder = f'./data/transformed/stats'
     # book keeping output
-    df_to_parquet(df = pd.DataFrame(grams), 
+    df_to_parquet(df = pd.DataFrame(grams.astype("string[pyarrow]")), 
             folder = folder, 
             file = f'/{n}_grams.parquet')
     df_to_parquet(df = pd.DataFrame(frequency.reset_index()), 
@@ -247,6 +249,6 @@ def unigram_probability(cleaned_text, unigram_relative_frequency):
     Bigram = P(are|students)*P(from|are)*P(vallore|from)
     P(are|students) = count(students|are)/count(students)
     """
-    total_probability = cleaned_text.apply(lambda tweet: np.prod(list(map(unigram_relative_frequency.get, tweet))))
+    total_probability = cleaned_text.apply(lambda tweet: np.prod(list(map(unigram_relative_frequency.get, str(tweet)))))
    
     return total_probability
