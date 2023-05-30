@@ -300,6 +300,11 @@ def df_to_parquet(df, folder, file):
     df.to_parquet(path= folder+file, index=False, engine='pyarrow')
     return
 
+def normalize_columns(df, columns):
+    for c in columns:
+        df[c] = (df[c] - df[c].min()) / (df[c].max() - df[c].min())
+    return df 
+
 def dataframe_astypes():
     """_summary_
     

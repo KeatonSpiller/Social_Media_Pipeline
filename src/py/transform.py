@@ -34,7 +34,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
         
 # %% [markdown]
 # - Load tools
-from transform_tools import clean_text, df_to_parquet, n_gram, unigram_probability, bigram_probability, dataframe_astypes
+from transform_tools import clean_text, df_to_parquet, n_gram, unigram_probability, bigram_probability, normalize_columns
 
 # %% [markdown]
 # # Load Twitter Usernames   
@@ -63,10 +63,13 @@ twitter_df = pd.read_parquet('./data/extracted/merged/all_twitter.parquet',
 # %% [markdown]
 # - Cleaning up tweet sentences -> websites(html/www) -> usernames | hashtags | digits -> extra spaces | stopwords | emoji
 # - punctuation (texthero) -> translate to english (in development) -> stemming similar words (e.g.. ['like' 'liked' 'liking'] to ['lik' 'lik' 'lik'])
+# %%
 cleaned_stem_text, cleaned_nonstem_text = clean_text(twitter_df.text, words_to_remove)
 cleaned_df = twitter_df.copy()
-cleaned_df['cleaned_stem_text'] = cleaned_stem_text.astype("string[pyarrow]")
-cleaned_df['cleaned_nonstem_text'] = cleaned_nonstem_text.astype("string[pyarrow]")
+
+# %%
+cleaned_df['cleaned_stem_text'] = cleaned_stem_text
+cleaned_df['cleaned_nonstem_text'] = cleaned_nonstem_text
 df_to_parquet(df = cleaned_df, 
             folder = f'./data/transformed', 
             file = f'/cleaned_twitter.parquet')
@@ -105,36 +108,80 @@ print(f"Finished ngram Extraction:\n")
 # $$ Bigram = P(W_{1:n})\approx\prod_{k=1}^n P(W_{k}|W_{k-1}) $$
 # $$ P(W_{n}|W_{n-1}) =  \dfrac{Count(W_{n-1}W{n})}{Count(W{n-1})} $$
 # $$ Trigram = P(W_{1:n})\approx\prod_{k=1}^n P(W_{k}|W_{{k-2}, W_{k-1}}) $$
+# ******************************************* Goal to optimize with pyArrow *******************************************
 print(f"Calculating Unigram Probability:\n")
-
-# ****************************************************************************************************
-# ****************************************************************************************************
-# Apache Pyarrow progress Here
-unigram_prob = unigram_probability(cleaned_df.cleaned_stem_text.astype("string[pyarrow]"), unigram_relative_frequency)
+unigram_prob = unigram_probability(cleaned_stem_text, unigram_relative_frequency)
 print(f"Finished Unigram Probability:\n")
-
-# print(f"Calculating Bigram Probability:\n")
-# bigram_prob = bigram_probability(cleaned_stem_text, bigram_sentence, unigram_frequency, bigram_frequency)
-# print(f"Finished Bigram Probability:\n")
+# %%
+print(f"Calculating Bigram Probability:\n")
+bigram_prob = bigram_probability(cleaned_stem_text, bigram_sentence, unigram_frequency, bigram_frequency)
+print(f"Finished Bigram Probability:\n")
 
 # %% [markdown]
 # - Combine ngram probability and cleaned text variations to dataframe
 cleaned_df_ngram = cleaned_df.copy()
-cleaned_df_ngram['bigram_sentence'] = bigram_sentence.reset_index(drop=True)
-cleaned_df_ngram['trigram_sentence'] = trigram_sentence.reset_index(drop=True)
-cleaned_df_ngram['quadgram_sentence'] = quadgram_sentence.reset_index(drop=True)
-cleaned_df_ngram['pentagram_sentence'] = pentagram_sentence.reset_index(drop=True)
+cleaned_df_ngram['bigram_sentence'] = bigram_sentence.reset_index(drop=True).astype("string[pyarrow]")
+cleaned_df_ngram['trigram_sentence'] = trigram_sentence.reset_index(drop=True).astype("string[pyarrow]")
+cleaned_df_ngram['quadgram_sentence'] = quadgram_sentence.reset_index(drop=True).astype("string[pyarrow]")
+cleaned_df_ngram['pentagram_sentence'] = pentagram_sentence.reset_index(drop=True).astype("string[pyarrow]")
 cleaned_df_ngram['unigram_probability'] = unigram_prob.reset_index(drop=True)
 cleaned_df_ngram['bigram_probability'] = bigram_prob
-
-# %%
 # Converting timestamp (HH:MM:SS) to Year-month-day to combine users on the same day
 cleaned_df_ngram.insert(loc = 0, column = 'date', value = pd.to_datetime(cleaned_df_ngram['created_at']).apply(lambda x: x.strftime('%Y-%m-%d')))
-cleaned_df_ngram.date = pd.to_datetime(cleaned_df_ngram['date'], format='%Y-%m-%d') # object to datetime64[ns] -> or to datetime64[ns, UTC]
-
-# %%
+cleaned_df_ngram.date = pd.to_datetime(cleaned_df_ngram['date'], format='%Y-%m-%d') # object to datetime64[ns] -> or to datetime64[ns, UTC] 
 cleaned_df_ngram = cleaned_df_ngram.sort_values(by=['date'], ascending=False)
+# exporting
 df_to_parquet(df = cleaned_df_ngram, 
             folder = f'./data/transformed', 
             file = f'/cleaned_twitter_ngram.parquet')
+
+# %%
+# 2nd Half pivots and normalization
+# - normalize probability column to 1 
+df_all_prob_norm = cleaned_df_ngram.copy()
+df_all_prob_norm.unigram_probability = cleaned_df_ngram.unigram_probability / cleaned_df_ngram.unigram_probability.sum()
+df_all_prob_norm.bigram_probability = cleaned_df_ngram.bigram_probability / cleaned_df_ngram.bigram_probability.sum()
+
+# - Threshold tweets
+if False:
+    threshold = '2017-01-01'
+    df_all_prob_norm = df_all_prob_norm[df_all_prob_norm.created_at > threshold]
+# %%
+# Any Inter quantile data to remove?
+# Upper 95% or lower 5%| Extrema
+
+df_to_parquet(df = df_all_prob_norm, 
+          folder = f'./data/transformed', 
+          file = f'/cleaned_twitter_ngram_norm.parquet')
+
+# %% Merge Users on same dates
+df_wide1 = df_all_prob_norm.pivot_table(index='date', 
+                                   values=['favorite_count','retweet_count'], 
+                                   aggfunc='sum',
+                                   fill_value=0).sort_values(by='date',
+                                                            ascending=False)
+df_wide2 = df_all_prob_norm.pivot_table(index='date', 
+                                   columns=['user'],
+                                   values=['unigram_probability','bigram_probability'], 
+                                   aggfunc={'unigram_probability': 'sum',
+                                            'bigram_probability': 'sum'},
+                                   fill_value=0 ).sort_values(by='date',
+                                                              ascending=False)#.droplevel(0, axis=1) 
+df_wide2.columns = pd.Series(['_'.join(str(s).strip() for s in col if s) for col in df_wide2.columns]).str.replace("probability_", "", regex=True)
+df_wide = pd.merge(df_wide1, df_wide2, how='inner', on='date').reset_index()
+df_to_parquet(df = df_wide, 
+          folder = f'./data/transformed', 
+          file = f'/pivot_user_by_date.parquet')
+
+# %% [markdown]
+# - To combine Sat/Sun Tweets with Monday
+week_end_mask = df_wide.date.dt.day_name().isin(['Saturday', 'Sunday', 'Monday'])
+week_end = df_wide.loc[week_end_mask, :]
+monday_group = week_end.groupby([pd.Grouper(key='date', freq='W-MON')]).sum().reset_index('date')
+# Apply the stripped mask
+df_wide_stripped = df_wide.reset_index().loc[~ week_end_mask, :]
+df_wide_wknd_merge = pd.merge(df_wide_stripped, monday_group, how='outer').set_index('date').sort_index(ascending=False).reset_index()
+df_to_parquet(df = df_wide_wknd_merge, 
+          folder = f'./data/transformed', 
+          file = f'/pivot_user_by_date_wkd_merge.parquet')
 # %%

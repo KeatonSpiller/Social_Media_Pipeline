@@ -2,7 +2,7 @@
 # Import libraries
 import os, sys, pandas as pd
 from flask import Flask, render_template, request
-from fileinput import filename
+import webbrowser
 
 # %%
 def main():            
@@ -56,18 +56,23 @@ def main():
         if(request.method == 'POST'):
             data = request.form
             if 'extract' in data:
-                print("Extract")
+                print("Extract Twitter")
                 import extract_twitter
-                print("load to MYSQL")
+                print("Extract Stocks")
+                import extract_stocks
+                print("load raw twitter to MYSQL")
                 import load_extract
             elif 'transform' in data:
                 print("Transform")
                 import transform
             else:
                 print("neither") # unknown
-        return render_template("index.html") 
-
-    app.run(port=5000, debug=True)
+        return render_template("index.html")
+    # Open a Webpage and run
+    port = 5000
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        webbrowser.open_new(f"http://127.0.0.1:{port}")
+    app.run(port=port, debug=True)
 
 # %%
 if __name__ == '__main__':

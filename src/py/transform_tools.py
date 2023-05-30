@@ -92,13 +92,13 @@ def clean_text(s, words_to_remove):
     s = s.str.replace(regex, "", regex=True)
     
     # remove stop words
-    
     # regex_remove = r"(?<!\w)(?:" + '|'.join(words_to_remove) + r")(?!\w)"
     or_words = '|'.join(words_to_remove)
     regex_remove = f"\b({or_words})\b"
     s = s.str.replace(regex_remove, "", regex=True)
+    
     # replace emoji
-    s = s.apply(lambda s: emoji.replace_emoji(s, ''))
+    s = s.apply(lambda s: emoji.replace_emoji(s, '')).astype("string[pyarrow]")
     
     # translate to english -> opus-mt | m2m_100_1.2B | mBART50_m2m
     # opus-mt limited to sentence less than 512 -> all others less than 1024
@@ -109,22 +109,23 @@ def clean_text(s, words_to_remove):
     # print(f"{s.str.len().max()}: Largest string before translation, index:{s.str.len().idxmax()}")
     # s = s.apply(lambda x: batch_translate(x, model, 512) )
     # print(f"{s.str.len().max()}: Largest string before translation, index:{s.str.len().idxmax()}")
-
+    
     # remove punctuation and library touch up
-    s = texthero.clean(s)
+    s = texthero.clean(s).astype("string[pyarrow]")
     
     # touch up remaining non characters and str split to remove leading/trailing spaces
-    s = s.str.replace(r'[^\w\s]+', "", regex=True).str.split()
+    s = s.str.replace(r'[^\w\s]+', "", regex=True)
+    string_list= s.str.split()
     
     # stemming similar words -> 'like' 'liked' 'liking' to stem:'lik'
     stemmer = SnowballStemmer("english")
-    stemmed = s.apply(lambda x: [stemmer.stem(y) for y in x])
+    stemmed = string_list.apply(lambda x: " ".join([stemmer.stem(y) for y in x]))
     
     # If I wish to filter frequency
     # filter out infrequent ( words used 1 or 2 times )
     # filter out frequent ( words used more than 1000 times?)
     print(f"Finished Cleaning Text:\n")
-    return stemmed, s
+    return stemmed.astype("string[pyarrow]"), s.astype("string[pyarrow]")
 
 def relative_probability(relative_frequency, cleaned_text):
     """_summary_
@@ -181,7 +182,8 @@ def n_gram(cleaned_text, n):
         grams, frequency and relative frequency Pandas Series
         ouputs csv files to to stats folder 
     """
-    grams = pd.Series(cleaned_text.apply(lambda tweet: list(ngrams(tweet, n))))
+    text_list = cleaned_text.str.split()
+    grams = pd.Series(text_list.apply(lambda tweet: list(ngrams(tweet, n))))
     frequency = pd.Series(collections.Counter(list(itertools.chain.from_iterable(grams))))
     relative_frequency = frequency / len(frequency)
     folder = f'./data/transformed/stats'
@@ -221,15 +223,16 @@ def bigram_probability(cleaned_text, bigram_sentence, unigram_frequency, bigram_
     # words ending with food divided by count of sentences
     P(<s>|food) = Count(<s>|food)/ Count(<s>) 
     """
+    text_list = cleaned_text.str.split()
     # acount for beginning and ending values P(word|<s>) (</s>|word)
-    beginning_words, ending_words = cleaned_text.str[0], cleaned_text.str[-1]
+    beginning_words, ending_words = text_list.str[0], text_list.str[-1]
     beginning_words_dict, ending_words_dict= beginning_words.value_counts(), ending_words.value_counts()
-
+    
     bigram_prob = []
     for i, sentence in enumerate(bigram_sentence):
         if sentence:
-            begin_prob = (beginning_words_dict[beginning_words[i:i+1]]/len(cleaned_text)).to_numpy()
-            end_prob = (ending_words_dict[ending_words[i:i+1]]/len(cleaned_text)).to_numpy()
+            begin_prob = (beginning_words_dict[beginning_words[i:i+1]]/len(text_list)).to_numpy()
+            end_prob = (ending_words_dict[ending_words[i:i+1]]/len(text_list)).to_numpy()
             bigram_prob.append(np.prod(np.append([bigram_frequency[tup]/unigram_frequency[tup[0]] for tup in sentence], (begin_prob * end_prob) )))
         else:
             bigram_prob.append(0)
@@ -249,6 +252,20 @@ def unigram_probability(cleaned_text, unigram_relative_frequency):
     Bigram = P(are|students)*P(from|are)*P(vallore|from)
     P(are|students) = count(students|are)/count(students)
     """
-    total_probability = cleaned_text.apply(lambda tweet: np.prod(list(map(unigram_relative_frequency.get, str(tweet)))))
-   
+    text_list = cleaned_text.str.split()
+    total_probability = text_list.apply(lambda tweet: np.prod(list(map(unigram_relative_frequency.get, tweet))))
+    
     return total_probability
+
+def normalize_columns(df, columns):
+    """_summary_
+    Min Max scaling the numerical data sets
+    grab all words from every text file, removing spaces and non nessesary words from stop list
+    Args:
+        df (_type_): _description_
+        columns (_type_): _description_
+    _why_
+    """
+    for c in columns:
+        df[c] = (df[c] - df[c].min()) / (df[c].max() - df[c].min())
+    return df 
