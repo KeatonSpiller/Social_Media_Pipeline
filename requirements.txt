@@ -13,6 +13,7 @@ flask ==2.3.2
 nltk == 3.6.2
 emoji ==2.2.0
 textherox >= 1.2.0 # uses gensim
+yfinance >= 0.2.18
 
 # tqdm == 4.65.0 # required for easyNMT
 # torch == 2.0.1 # required for easyNMT

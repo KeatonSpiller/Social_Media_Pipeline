@@ -1,8 +1,7 @@
 # %%
 # Import libraries
-import os, sys, pandas as pd
+import os, sys, pandas as pd, webbrowser, subprocess
 from flask import Flask, render_template, request
-import webbrowser
 
 # %%
 def main():            
@@ -30,24 +29,59 @@ def main():
     def home():
         return render_template("index.html")
     
-    @app.route("/upload", methods=["POST"])
-    def upload():
+    @app.route("/openuserfolder", methods=["POST"])
+    def openuserfolder():
+        file = os.path.normpath('./user_input')
+        if(request.method == 'POST'):
+            data = request.form
+            if 'openuserfolder' in data:
+                print("Open User Folder")
+                if(os.path.exists(file)):
+                    subprocess.Popen(f"explorer {file}")
+                else:
+                    os.mkdir(file)
+                    subprocess.Popen(f"explorer {file}")
+        return render_template("index.html")
+    
+    @app.route("/opencredfolder", methods=["POST"])
+    def opencredfolder():
+        file = os.path.normpath('./credentials')
+        if(request.method == 'POST'):
+            data = request.form
+            if 'opencredfolder' in data:
+                print("Open Credential Folder")
+                if(os.path.exists(file)):
+                    subprocess.Popen(f"explorer {file}")
+                else:
+                    os.mkdir(file)
+                    subprocess.Popen(f"explorer {file}")
+        return render_template("index.html")
+    
+    @app.route("/userupload", methods=["POST"])
+    def userupload():
     
         # Read the File using Flask request
         file = request.files['file']
-    
         # save file in local directory
         UPLOAD_FOLDER = os.path.normpath('./user_input')
         if(not os.path.exists(UPLOAD_FOLDER)):
             os.mkdir(UPLOAD_FOLDER)
         app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], 'twitter_users.xlsx'))
         
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-        
-        # Parse the data as a Pandas DataFrame type
-        # data = pd.read_excel(file)
-        # Return HTML snippet that will render the table
-        # return data.to_html()
+        return render_template("index.html") 
+    
+    @app.route("/tickerupload", methods=["POST"])
+    def tickerupload():
+    
+        # Read the File using Flask request
+        file = request.files['file']
+        # save file in local directory
+        UPLOAD_FOLDER = os.path.normpath('./user_input')
+        if(not os.path.exists(UPLOAD_FOLDER)):
+            os.mkdir(UPLOAD_FOLDER)
+        app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], 'stock_tickers.xlsx'))
         
         return render_template("index.html") 
     
@@ -55,19 +89,39 @@ def main():
     def etl():
         if(request.method == 'POST'):
             data = request.form
-            if 'extract' in data:
+            if 'extract_twitter' in data:
                 print("Extract Twitter")
                 import extract_twitter
+            elif 'extract_stocks' in data:
                 print("Extract Stocks")
                 import extract_stocks
+            elif 'load_mysql_extract' in data:
                 print("load raw twitter to MYSQL")
                 import load_extract
+            elif 'load_mysql_transform' in data:
+                print("load raw twitter to MYSQL")
+                # import load_extract
             elif 'transform' in data:
                 print("Transform")
                 import transform
             else:
                 print("neither") # unknown
         return render_template("index.html")
+    
+    @app.route("/opendatafolder", methods=["POST"])
+    def opendatafolder():
+        file = os.path.normpath('./data')
+        if(request.method == 'POST'):
+            data = request.form
+            if 'opendatafolder' in data:
+                print("Open Data Folder")
+                if(os.path.exists(file)):
+                    subprocess.Popen(f"explorer {file}")
+                else:
+                    os.mkdir(file)
+                    subprocess.Popen(f"explorer {file}")
+        return render_template("index.html")
+    
     # Open a Webpage and run
     port = 5000
     if not os.environ.get("WERKZEUG_RUN_MAIN"):

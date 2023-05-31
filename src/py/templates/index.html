@@ -5,7 +5,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Twitter ETL</title>
+        <title>Social Media ETL</title>
         <style>
         #content {
             background-color: #ddd;
@@ -17,46 +17,126 @@
         <h1>Social Media Pipeline </h1>
         </center>
     </head>
-
-    <body>
-        <h1>Twitter</h1>
-        <h3>Upload Twitter User Handles (.xlsx)</h3>
-        <form  action="/upload" method="post" enctype="multipart/form-data">
-            <center>
-            <input 
-            type="file"
-            name="file"
-            style="background: rgba(239, 239, 240, 1);color:rgb(0, 0, 0);"
-            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-
-            <input 
-            type="submit"
-            style="background: rgb(0, 83, 139);color:white;"
-            value="Upload">
-            </center>
-
-        </form>
-    </body>
-
     <center>
-        &nbsp;
         <body>
-            <form action="/etl" method ="post">
 
+            <body>
+                <form action="/openuserfolder" method ="post">
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(0, 83, 139);color:white;"  
+                    name="openuserfolder" 
+                    value="openuserfolder"> Open User Input </button>
+                    <h3></h3>
+                </form> 
+            </body>
+
+            <body>
+                <form action="/opencredfolder" method ="post">
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(0, 83, 139);color:white;"  
+                    name="opencredfolder" 
+                    value="opencredfolder"> Open Credential Input </button>
+                    <h3></h3>
+                </form> 
+            </body>
+
+            <h3>Upload Twitter User Handles (.xlsx)</h3>
+            <form  action="/userupload" method="post" enctype="multipart/form-data">
+                <input 
+                type="file"
+                name="file"
+                style="background: rgba(239, 239, 240, 1);color:rgb(0, 0, 0);"
+                accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+
+                <input 
+                type="submit"
+                style="background: rgb(0, 83, 139);color:white;"
+                value="Upload">
+
+            </form>
+
+            <h3>Upload Stock Tickers With Company Names (.xlsx)</h3>
+            <form  action="/tickerupload" method="post" enctype="multipart/form-data">
+                <input 
+                type="file"
+                name="file"
+                style="background: rgba(239, 239, 240, 1);color:rgb(0, 0, 0);"
+                accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+
+                <input 
+                type="submit"
+                style="background: rgb(0, 83, 139);color:white;"
+                value="Upload">
+
+            </form>
+        </body>
+
+            &nbsp;
+            <body>
+                <form action="/etl" method ="post">
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(0, 83, 139);color:white;"  
+                    name="extract_twitter" 
+                    value="extract_twitter"> extract_twitter </button>
+                    <h3></h3>
+                    
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(0, 83, 139);color:white;"  
+                    name="extract_stocks" 
+                    value="extract_stocks"> extract_stocks </button>
+                    <h3></h3>
+
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(63, 0, 139);color:white;"  
+                    name="transform" 
+                    value="transform"> Transform </button>
+                    <h3></h3>
+                    
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(0, 83, 139);color:white;"  
+                    name="load_mysql_extract" 
+                    value="load_mysql_extract"> load_mysql_extract </button>
+                    <h3></h3>
+
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(0, 83, 139);color:white;"  
+                    name="load_mysql_transform" 
+                    value="load_mysql_transform"> load_mysql_transform </button>
+                    <h3></h3>
+
+                </form> 
+            </body>
+        <body>
+            <form action="/opendatafolder" method ="post">
+                &emsp;
                 <button 
                 type="submit"
                 onclick="toggle();"
                 style="background: rgb(0, 83, 139);color:white;"  
-                name="extract" 
-                value="extract"> Extract </button>
+                name="opendatafolder" 
+                value="opendatafolder"> Open output data </button>
                 <h3></h3>
-                <button 
-                type="submit"
-                onclick="toggle();"
-                style="background: rgb(63, 0, 139);color:white;"  
-                name="transform" 
-                value="transform"> Transform </button>
-
             </form> 
         </body>
     </center>

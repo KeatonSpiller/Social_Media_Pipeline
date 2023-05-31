@@ -25,44 +25,54 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
 from extract_tools import df_to_parquet, normalize_columns
 
 # %% [markdown]
-# - Read in Ticker labels
+# - Read in Stocks to download from yahoo finance
 with open(os.path.normpath(os.getcwd() + './user_input/stock_tickers.xlsx'), 'rb') as f:
     ticker_df = pd.read_excel(f, sheet_name='ticker_sheet')
     ticker_df = ticker_df.where(pd.notnull(ticker_df), '')
     f.close()
+stock_str = " ".join(ticker_df.ticker_name)
 
 # %% [markdown]
-# - Downloding stock tickers values
-# how_far_back = df_wide.index.min().date()
+# - Determine date range to download stocks
+# (i.e., start='2000-01-01' to end='2023-01-01')
 file = './data/transformed/pivot_user_by_date_wkd_merge.parquet'
+today = date.today()
 if os.path.exists(file):
-    df = pd.read_parquet(file)
+    df = pd.read_parquet(file, engine= 'pyarrow', dtype_backend = 'pyarrow')
     how_far_back = df.date.min().date()
 else:
-    how_far_back = '1980-01-01'
-today = date.today()
+    how_far_back = '2000-01-01'
+n = len(ticker_df.ticker_label) # how many tickers
 print(f'{how_far_back} -> {today}')
-column_names = dict(zip(ticker_df.ticker_name, ticker_df.ticker_label))
-column_names['Date']='date'
-stock_list = list(ticker_df.ticker_name)
-stock_str = ' '.join( stock_list )
-# downloading stock tickers from list
-stock_tickers_df = yf.download(stock_str, how_far_back, today, interval = '1d', progress=False)['Close'].reset_index('Date').rename(columns=column_names).fillna(0)
 
-# converting to float and aligning date to the same data type
-convert_dict = dict(zip(ticker_df.ticker_label, ['float64']*len(ticker_df.ticker_label)))
-convert_dict['date'] = 'datetime64[ns]'
-stock_tickers_df = stock_tickers_df.astype(convert_dict)
+# Columns to rename
+column_rename  =(({'Date':'date'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
+
+# %%
+# Download closing prices for Stocks from date Range
+stock_tickers_df = yf.download(stock_str,
+                               how_far_back,
+                               today,
+                               interval = '1d',
+                               progress=False)['Close'].reset_index().rename(columns=column_rename).fillna(0)
+# %%
+# convert to pyarrow
+stock_tickers_df = stock_tickers_df.set_index('date')
+stock_tickers_df = stock_tickers_df.astype('float64[pyarrow]').reset_index().astype({'date':'datetime64[ns]'})
+stock_tickers_df.head()
+stock_tickers_df.dtypes
+# %%
 # export original
 df_to_parquet(df = stock_tickers_df, 
           folder = f'./data/extracted/merged', 
           file = f'/stock_tickers.parquet')
-
-# Min Max normalize ticker columns and favorite/retweet counts
-columns = list(ticker_df.ticker_label) + ['favorite_count', 'retweet_count']
-df_merge = normalize_columns(stock_tickers_df.copy(), columns)
+# Min Max normalize tickers
+columns = list(ticker_df.ticker_label)
+stock_tickers_df_norm = normalize_columns(stock_tickers_df.copy(), columns)
+stock_tickers_df_norm.head()
+# %%
 # export normalized
-df_to_parquet(df = stock_tickers_df, 
+df_to_parquet(df = stock_tickers_df_norm, 
           folder = f'./data/extracted/merged', 
           file = f'/stock_tickers_norm.parquet')
 # %%
