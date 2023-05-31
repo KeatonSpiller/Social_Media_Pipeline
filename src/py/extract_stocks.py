@@ -31,6 +31,7 @@ with open(os.path.normpath(os.getcwd() + './user_input/stock_tickers.xlsx'), 'rb
     ticker_df = ticker_df.where(pd.notnull(ticker_df), '')
     f.close()
 stock_str = " ".join(ticker_df.ticker_name)
+n = len(ticker_df.ticker_label) # how many tickers
 
 # %% [markdown]
 # - Determine date range to download stocks
@@ -42,7 +43,6 @@ if os.path.exists(file):
     how_far_back = df.date.min().date()
 else:
     how_far_back = '2000-01-01'
-n = len(ticker_df.ticker_label) # how many tickers
 print(f'{how_far_back} -> {today}')
 
 # Columns to rename
@@ -59,8 +59,6 @@ stock_tickers_df = yf.download(stock_str,
 # convert to pyarrow
 stock_tickers_df = stock_tickers_df.set_index('date')
 stock_tickers_df = stock_tickers_df.astype('float64[pyarrow]').reset_index().astype({'date':'datetime64[ns]'})
-stock_tickers_df.head()
-stock_tickers_df.dtypes
 # %%
 # export original
 df_to_parquet(df = stock_tickers_df, 
@@ -73,6 +71,6 @@ stock_tickers_df_norm.head()
 # %%
 # export normalized
 df_to_parquet(df = stock_tickers_df_norm, 
-          folder = f'./data/extracted/merged', 
+          folder = f'./data/transformed/stocks', 
           file = f'/stock_tickers_norm.parquet')
 # %%

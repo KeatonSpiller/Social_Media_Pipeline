@@ -1,1 +1,1 @@
-__all__ = ['py','sql','web']
+__all__ = ['py','sql']

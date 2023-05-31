@@ -102,8 +102,8 @@ def main():
                 print("load raw twitter to MYSQL")
                 # import load_extract
             elif 'transform' in data:
-                print("Transform")
-                import transform
+                print("transform_twitter")
+                import transform_twitter
             else:
                 print("neither") # unknown
         return render_template("index.html")

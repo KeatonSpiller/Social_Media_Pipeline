@@ -71,7 +71,7 @@ cleaned_df = twitter_df.copy()
 cleaned_df['cleaned_stem_text'] = cleaned_stem_text
 cleaned_df['cleaned_nonstem_text'] = cleaned_nonstem_text
 df_to_parquet(df = cleaned_df, 
-            folder = f'./data/transformed', 
+            folder = f'./data/transformed/twitter', 
             file = f'/cleaned_twitter.parquet')
 
 # %% [] 
@@ -132,7 +132,7 @@ cleaned_df_ngram.date = pd.to_datetime(cleaned_df_ngram['date'], format='%Y-%m-%
 cleaned_df_ngram = cleaned_df_ngram.sort_values(by=['date'], ascending=False)
 # exporting
 df_to_parquet(df = cleaned_df_ngram, 
-            folder = f'./data/transformed', 
+            folder = f'./data/transformed/twitter', 
             file = f'/cleaned_twitter_ngram.parquet')
 
 # %%
@@ -151,7 +151,7 @@ if False:
 # Upper 95% or lower 5%| Extrema
 
 df_to_parquet(df = df_all_prob_norm, 
-          folder = f'./data/transformed', 
+          folder = f'./data/transformed/twitter', 
           file = f'/cleaned_twitter_ngram_norm.parquet')
 
 # %% Merge Users on same dates
@@ -170,7 +170,7 @@ df_wide2 = df_all_prob_norm.pivot_table(index='date',
 df_wide2.columns = pd.Series(['_'.join(str(s).strip() for s in col if s) for col in df_wide2.columns]).str.replace("probability_", "", regex=True)
 df_wide = pd.merge(df_wide1, df_wide2, how='inner', on='date').reset_index()
 df_to_parquet(df = df_wide, 
-          folder = f'./data/transformed', 
+          folder = f'./data/transformed/twitter', 
           file = f'/pivot_user_by_date.parquet')
 
 # %% [markdown]
@@ -179,9 +179,10 @@ week_end_mask = df_wide.date.dt.day_name().isin(['Saturday', 'Sunday', 'Monday']
 week_end = df_wide.loc[week_end_mask, :]
 monday_group = week_end.groupby([pd.Grouper(key='date', freq='W-MON')]).sum().reset_index('date')
 # Apply the stripped mask
-df_wide_stripped = df_wide.reset_index().loc[~ week_end_mask, :]
+df_wide_stripped = df_wide.reset_index(drop=True).loc[~ week_end_mask, :]
 df_wide_wknd_merge = pd.merge(df_wide_stripped, monday_group, how='outer').set_index('date').sort_index(ascending=False).reset_index()
+# %%
 df_to_parquet(df = df_wide_wknd_merge, 
-          folder = f'./data/transformed', 
+          folder = f'./data/transformed/twitter', 
           file = f'/pivot_user_by_date_wkd_merge.parquet')
 # %%

@@ -186,7 +186,7 @@ def n_gram(cleaned_text, n):
     grams = pd.Series(text_list.apply(lambda tweet: list(ngrams(tweet, n))))
     frequency = pd.Series(collections.Counter(list(itertools.chain.from_iterable(grams))))
     relative_frequency = frequency / len(frequency)
-    folder = f'./data/transformed/stats'
+    folder = f'./data/transformed/twitter/stats'
     # book keeping output
     df_to_parquet(df = pd.DataFrame(grams.astype("string[pyarrow]")), 
             folder = folder, 

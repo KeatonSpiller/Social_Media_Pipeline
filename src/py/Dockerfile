@@ -12,6 +12,9 @@ COPY __init__.py /Social_Media_Pipeline/__init__.py
 
 CMD ["python", "src/py/main.py"]
 
+# Newest addition flask
+ENTRYPOINT FLASK_APP= /src/py/main.py flask run --host=0.0.0.0
+
 RUN pip install -r requirements.txt
 
 # ----Docker Commands----
