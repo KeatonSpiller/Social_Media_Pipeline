@@ -267,10 +267,7 @@ def merge_files(folder, merge, group, display):
     return df 
 
 # - Merge Tweets
-def merge_tweets(twitter_groups):
-    folder = f"./data/extracted/raw/twitter/"
-    merge = f"./data/extracted/merged/twitter/groups/"
-    all_merge = f"./data/extracted/merged/"
+def merge_tweets(twitter_groups, folder, merge, all_merge):
     df = pd.DataFrame()
     for group in twitter_groups:
         df_temp_group = merge_files(folder, merge, group, display = 0)
@@ -299,11 +296,6 @@ def df_to_parquet(df, folder, file):
         os.makedirs(folder)
     df.to_parquet(path= folder+file, index=False, engine='pyarrow')
     return
-
-def normalize_columns(df, columns):
-    for c in columns:
-        df[c] = (df[c] - df[c].min()) / (df[c].max() - df[c].min())
-    return df 
 
 def dataframe_astypes():
     """_summary_

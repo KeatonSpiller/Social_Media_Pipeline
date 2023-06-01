@@ -27,7 +27,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
   
 # %% [markdown]
 ## Load Custom Functions
-from extract_tools import user_download, twitter_authentication, merge_tweets
+from extract_twitter_tools import user_download, twitter_authentication, merge_tweets
 
 # %% [markdown]
 # # Twitter API Credentials
@@ -64,6 +64,9 @@ print('Twitter user download complete')
 
 # %%
 # Merge all Tweets Together
-all_tweets_df = merge_tweets(twitter_groups)
+all_tweets_df = merge_tweets(twitter_groups,
+                            folder = f"./data/extracted/raw/twitter/",
+                            merge = f"./data/extracted/merged/twitter/groups/",
+                            all_merge = f"./data/extracted/merged/twitter")
 print(f"size of merged tweets file: {all_tweets_df.shape}")
 # %%

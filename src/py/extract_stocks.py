@@ -22,7 +22,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
         print(f"{e}\n:Please start current working directory from {top_level_folder}")
 
 # import local files
-from extract_tools import df_to_parquet, normalize_columns
+from extract_stocks_tools import *
 
 # %% [markdown]
 # - Read in Stocks to download from yahoo finance
@@ -31,12 +31,10 @@ with open(os.path.normpath(os.getcwd() + './user_input/stock_tickers.xlsx'), 'rb
     ticker_df = ticker_df.where(pd.notnull(ticker_df), '')
     f.close()
 stock_str = " ".join(ticker_df.ticker_name)
-n = len(ticker_df.ticker_label) # how many tickers
 
-# %% [markdown]
-# - Determine date range to download stocks
-# (i.e., start='2000-01-01' to end='2023-01-01')
-file = './data/transformed/pivot_user_by_date_wkd_merge.parquet'
+# %%
+# Cross reference Twitter for how far back to download
+file = './data/transformed/twitter/pivot_user_by_date_wkd_merge.parquet'
 today = date.today()
 if os.path.exists(file):
     df = pd.read_parquet(file, engine= 'pyarrow', dtype_backend = 'pyarrow')
@@ -46,31 +44,32 @@ else:
 print(f'{how_far_back} -> {today}')
 
 # Columns to rename
-column_rename  =(({'Date':'date'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
+column_rename_historical  =(({'Date':'date'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
+column_rename_today  =(({'Datetime':'date'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
+columns_to_normalize = list(ticker_df.ticker_label)
 
-# %%
-# Download closing prices for Stocks from date Range
-stock_tickers_df = yf.download(stock_str,
-                               how_far_back,
-                               today,
-                               interval = '1d',
-                               progress=False)['Close'].reset_index().rename(columns=column_rename).fillna(0)
-# %%
-# convert to pyarrow
-stock_tickers_df = stock_tickers_df.set_index('date')
-stock_tickers_df = stock_tickers_df.astype('float64[pyarrow]').reset_index().astype({'date':'datetime64[ns]'})
-# %%
-# export original
-df_to_parquet(df = stock_tickers_df, 
-          folder = f'./data/extracted/merged', 
-          file = f'/stock_tickers.parquet')
-# Min Max normalize tickers
-columns = list(ticker_df.ticker_label)
-stock_tickers_df_norm = normalize_columns(stock_tickers_df.copy(), columns)
-stock_tickers_df_norm.head()
-# %%
-# export normalized
-df_to_parquet(df = stock_tickers_df_norm, 
-          folder = f'./data/transformed/stocks', 
-          file = f'/stock_tickers_norm.parquet')
+# Download Range of Stocks
+historical_stocks_df = download_historical_stocks(stocks_to_download=stock_str,
+                                              columns_to_rename = column_rename_historical,
+                                              how_far_back=how_far_back,
+                                              upto=today,
+                                              file='stock_tickers',
+                                              folder=f'./data/extracted/merged/stocks')
+# Min Max Normalize historical Stocks
+normalize_historical_stocks(df=historical_stocks_df.copy(),
+                            columns= columns_to_normalize, 
+                            file="stock_tickers_norm",
+                            folder=f'./data/transformed/stocks')
+
+# Download Todays Stocks
+todays_stocks_df = download_todays_stocks(stocks_to_download=stock_str, 
+                                        columns_to_rename=column_rename_today, 
+                                        file="todays_stock_tickers",
+                                        folder=f'./data/extracted/merged/stocks')
+# Min Max Normalize Todays Stocks
+normalize_todays_stocks(df_today=todays_stocks_df,
+                        df_historical=historical_stocks_df.copy(), 
+                        columns= columns_to_normalize, 
+                        file="todays_stock_tickers_norm",
+                        folder=f'./data/transformed/stocks')
 # %%

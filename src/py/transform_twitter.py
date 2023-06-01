@@ -55,7 +55,7 @@ words_to_remove = sorted(list( dict.fromkeys(stopwords) )) # remove duplicates
 
 # %%
 # Read in Raw Tweets
-twitter_df = pd.read_parquet('./data/extracted/merged/all_twitter.parquet', 
+twitter_df = pd.read_parquet('./data/extracted/merged/twitter/all_twitter.parquet', 
                              engine= 'pyarrow',
                              dtype_backend = 'pyarrow')
 # twitter_df = pd.read_parquet('./data/extracted/merged/all_twitter.parquet').astype(dataframe_astypes())
@@ -142,13 +142,19 @@ df_all_prob_norm = cleaned_df_ngram.copy()
 df_all_prob_norm.unigram_probability = cleaned_df_ngram.unigram_probability / cleaned_df_ngram.unigram_probability.sum()
 df_all_prob_norm.bigram_probability = cleaned_df_ngram.bigram_probability / cleaned_df_ngram.bigram_probability.sum()
 
+# normalize min/max favorite_count and retweet_count
+columns = ['favorite_count','retweet_count']
+for c in columns:
+    df_all_prob_norm[c] = (df_all_prob_norm[c] - df_all_prob_norm[c].min()) / (df_all_prob_norm[c].max() - df_all_prob_norm[c].min())
+    
 # - Threshold tweets
 if False:
     threshold = '2017-01-01'
     df_all_prob_norm = df_all_prob_norm[df_all_prob_norm.created_at > threshold]
+    
 # %%
 # Any Inter quantile data to remove?
-# Upper 95% or lower 5%| Extrema
+# Upper 95% or lower 5% | Extrema
 
 df_to_parquet(df = df_all_prob_norm, 
           folder = f'./data/transformed/twitter', 

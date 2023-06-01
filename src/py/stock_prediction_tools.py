@@ -87,11 +87,6 @@ def create_target(df, day = 5, ticker= "SandP_500"):
         pass
     return df 
 
-def normalize_columns_target(df, df_original, columns):
-    for c in columns:
-        df[c] = (df[c] - df_original[c].min()) / (df_original[c].max() - df_original[c].min())
-    return df 
-
 def download_todays_test(ticker_df, df_normalized, df_original):
     # Download today's Index funds, and twitter probabilities
     
