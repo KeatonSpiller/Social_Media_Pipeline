@@ -92,18 +92,21 @@ def main():
             if 'extract_twitter' in data:
                 print("Extract Twitter")
                 import extract_twitter
+            elif 'transform_twitter' in data:
+                print("transform_twitter")
+                import transform_twitter
             elif 'extract_stocks' in data:
                 print("Extract Stocks")
                 import extract_stocks
-            elif 'load_mysql_extract' in data:
+            elif 'load_mysql_twitter_extract' in data:
                 print("load raw twitter to MYSQL")
                 import load_extract
-            elif 'load_mysql_transform' in data:
+            elif 'load_mysql_twitter_transform' in data:
                 print("load raw twitter to MYSQL")
                 # import load_extract
-            elif 'transform' in data:
-                print("transform_twitter")
-                import transform_twitter
+            elif 'stock_prediction' in data:
+                print("stock_prediction")
+                import stock_prediction
             else:
                 print("neither") # unknown
         return render_template("index.html")

@@ -25,33 +25,54 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
 # import local files
 from stock_prediction_tools import *
 
-# %% Historical Data
-historical_stocks_df = pd.read_parquet('./data/transformed/stocks/stock_tickers_norm.parquet',
+# %% 
+# Historical stocks by day
+historical_stocks_byday_df = pd.read_parquet('./data/transformed/stocks/stock_tickers_byday_norm.parquet',
                             engine= 'pyarrow',
                             dtype_backend = 'pyarrow')
-
-historical_twitter_df = pd.read_parquet('./data/transformed/twitter/pivot_user_by_date_wkd_merge.parquet', 
+# Historical stocks by hour
+historical_stocks_byhour_df = pd.read_parquet('./data/transformed/stocks/stock_tickers_byhour_norm.parquet',
+                            engine= 'pyarrow',
+                            dtype_backend = 'pyarrow')
+# %%
+# Historical twitter by day
+historical_twitter_byday_df = pd.read_parquet('./data/transformed/twitter/pivot_user_wkd_merge_byday.parquet', 
+                             engine= 'pyarrow',
+                             dtype_backend = 'pyarrow')
+# Historical twitter by hour
+historical_twitter_byhour_df = pd.read_parquet('./data/transformed/twitter/pivot_user_wkd_merge_byhour.parquet', 
                              engine= 'pyarrow',
                              dtype_backend = 'pyarrow')
 
 # Merging historical twitter probabilities and ticker prices
-historical_merge_df = pd.merge(historical_stocks_df, historical_twitter_df, how='inner', on='date').fillna(0)
+# by day
+historical_merge_byday_df = pd.merge(historical_stocks_byday_df, historical_twitter_byday_df, how='inner', on='date').fillna(0)
 # Export historical twitter and stock merge
-df_to_parquet(df = historical_merge_df, 
+df_to_parquet(df = historical_merge_byday_df, 
         folder = f'./data/transformed/merged', 
-        file = f'/historical_twitter_stock_merge.parquet')
+        file = f'/historical_merge_byday.parquet')
+
+# Merging historical twitter probabilities and ticker prices
+# by hour
+historical_merge_byhour_df = pd.merge(historical_stocks_byhour_df, historical_twitter_byhour_df, how='inner', on='date').fillna(0)
+# Export historical twitter and stock merge
+df_to_parquet(df = historical_merge_byhour_df, 
+        folder = f'./data/transformed/merged', 
+        file = f'/historical_merge_byhour.parquet')
 
 # %% Todays Data
 today = date.today()
-todays_twitter_df = historical_twitter_df[historical_twitter_df['date'] == today]
+todays_twitter_df = historical_twitter_byhour_df[historical_twitter_byhour_df['date'] == today]
 todays_stocks_df = pd.read_parquet('./data/transformed/stocks/todays_stock_tickers_norm.parquet', 
                                     engine= 'pyarrow',
                                     dtype_backend = 'pyarrow')
-todays_merge_df = pd.merge(todays_stocks_df, todays_twitter_df, how='inner', on='date')
-# todays_merge_df = pd.merge(todays_stocks_df, todays_twitter_df.drop(columns='date'), how='cross')
-# Export todays twitter and stock merge
-df_to_parquet(df = todays_merge_df, folder = f'./data/transformed/merged', file = f'/todays_twitter_stock_merge.parquet')
+# %%
+# ***************************************************************************************************************
+# historical_stocks_byhour_df
 
+# %%
+todays_merge_df = pd.merge(todays_stocks_df, todays_twitter_df, how='inner', on='date')
+df_to_parquet(df = todays_merge_df, folder = f'./data/transformed/merged', file = f'/todays_twitter_stock_merge.parquet')
 # %%
 # Build Target and predict
 Xnew = sm.add_constant(todays_merge_df.set_index('date'), has_constant='add')
@@ -63,7 +84,18 @@ for t in stock_list:
     m = linear_model(data_with_target,split=0.20,summary = False)
     y_pred = m['lm'].predict(Xnew)
     model[t] = (y_pred, m)
+print(model)
 # %%
-# print(model.sort_index(ascending=False))
-model
+
+# predicting by minute
+# historical_stocks_df_byminute = pd.read_parquet('./data/transformed/stocks/stock_tickers_norm.parquet',
+#                             engine= 'pyarrow',
+#                             dtype_backend = 'pyarrow')
+# historical_twitter_df_byminute = pd.read_parquet('./data/transformed/twitter/cleaned_twitter_ngram_norm.parquet', 
+#                              engine= 'pyarrow',
+#                              dtype_backend = 'pyarrow')
+
+# historical_twitter_by_minute = historical_twitter_df_byminute.loc[:, ['created_at', 'favorite_count', 'retweet_count', 'unigram_probability', 'bigram_probability']]
+# historical_twitter_by_minute
+
 # %%

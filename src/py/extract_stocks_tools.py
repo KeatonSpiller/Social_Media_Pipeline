@@ -1,12 +1,14 @@
 import yfinance as yf, pandas as pd, os
 
-def download_historical_stocks(stocks_to_download, columns_to_rename, how_far_back, upto, file, folder, interval = '1d',progress = False):
+def download_historical_stocks(stocks_to_download, columns_to_rename, how_far_back, upto, file, folder, progress = False, period='1d', interval = '1d'):
     
     # Download closing prices for Stocks from date Range
     df = yf.download(stocks_to_download,
                                 how_far_back,
                                 upto,
+                                period=period,
                                 interval = interval,
+                                keepna=True,
                                 progress=progress)['Close'].reset_index().rename(columns=columns_to_rename).fillna(0)
     # convert to pyarrow
     df = df.set_index('date')
@@ -29,7 +31,8 @@ def normalize_historical_stocks(df, columns, file, folder):
 def download_todays_stocks(stocks_to_download, columns_to_rename, file, folder, period='1d', interval='1m'):
     df = yf.download(stocks_to_download, 
                                    period=period, 
-                                   interval = interval, 
+                                   interval = interval,
+                                   keepna=True, 
                                    progress=False)['Close'].reset_index().rename(columns=columns_to_rename).fillna(0)
     # convert to pyarrow
     df = df.set_index('date')

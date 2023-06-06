@@ -1,6 +1,6 @@
-import os,sys,re,glob,ipykernel,tweepy,stockmarket,nltk,collections,itertools,pandas as pd,numpy as np,\
+import os,sys,re,glob,tweepy,nltk,collections,itertools,pandas as pd,numpy as np,\
         seaborn as sns, yfinance as yf, matplotlib.pyplot as plt, statsmodels.formula.api as smf,\
-        statsmodels.api as sm, autoreload, importlib
+        statsmodels.api as sm
 from pathlib import Path
 from string import punctuation 
 from datetime import date

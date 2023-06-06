@@ -1,20 +1,32 @@
 # pip freeze | findstr lxml
 pandas >= 2.0.1
 numpy >= 1.23.4
-argon2-cffi == 21.3.0
-mysql-connector-python == 8.0.33
-sqlalchemy-mate == 1.4.28.3
-advertools >= 0.13.2
-regex == 2021.8.28
-tweepy == 4.12.1
+advertools >= 0.13.2 # faster pandas
+
+argon2-cffi == 21.3.0 # Hashing Encryption
+
 glob2 == 0.7
 openpyxl==3.0.10
-flask ==2.3.2
-nltk == 3.6.2
+
+nltk == 3.6.2 # natural language libraries
+flask ==2.3.2 # web API
+
+# database
+mysql-connector-python == 8.0.33
+sqlalchemy-mate == 1.4.28.3
+
+# extraction
+tweepy == 4.12.1 # twitter
+yfinance >= 0.2.18 # financial stocks
+
+# cleaning
+regex == 2021.8.28
 emoji ==2.2.0
 textherox >= 1.2.0 # uses gensim
-yfinance >= 0.2.18
+
+# analysis
 statsmodels == 0.14.0
+seaborn == 0.12.2
 
 # tqdm == 4.65.0 # required for easyNMT
 # torch == 2.0.1 # required for easyNMT

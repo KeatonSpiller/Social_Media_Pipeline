@@ -7,7 +7,8 @@
 
 # %% [markdown]
 ## Import Libraries
-import os, pandas as pd, openpyxl
+import os, pandas as pd, tweepy
+from fp.fp import FreeProxy
 
 # %% [markdown]
 # - Change Directory to top level folder
@@ -27,13 +28,49 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
   
 # %% [markdown]
 ## Load Custom Functions
-from extract_twitter_tools import user_download, twitter_authentication, merge_tweets
+from extract_twitter_tools_proxy import user_download, twitter_authentication, merge_tweets
 
 # %% [markdown]
 # # Twitter API Credentials
 # Read in keys from a csv file
+def twitter_authentication(autentication_path, proxy_url):
+    """_summary_
+    Read in twitter api credentials stored on csv file under user_input
+    _why_
+    Args:
+        autentication_path (_type_): _description_
+    """
+    
+    readin_authentication = pd.read_csv(autentication_path, header=0, sep=',')
+    consumer_key = readin_authentication['consumer_key'][0]
+    consumer_secret = readin_authentication['consumer_secret'][0]
+    access_token = readin_authentication['access_token'][0]
+    access_token_secret = readin_authentication['access_token_secret'][0]
+    bearer_token = readin_authentication['beaker_token'][0]
+
+    # connect to twitter application 
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+    api = tweepy.API(auth,
+                     proxy=proxy_url,
+                     wait_on_rate_limit = True)
+    return api
+# https://www.sslproxies.org/
+countries = {'US':'United_States', 'RU':'Russian_Federation', 'IN':'India', 'NL':'Netherlands',
+           'FR':'France', 'KR':'South_Korea', 'SE':'Sweeden', 'SG':'Singapore'}
+proxies = {}
+for id in countries.keys():
+    try:
+        proxy = FreeProxy( country_id=[id],
+                            timeout=0.3).get()
+        proxies[id] = proxy
+    except Exception as e:
+        print(f"{e} {countries[id]}\n")
+print(proxies)
+# %%
 authentication_path = os.path.abspath('./credentials/twitter.csv')
-api = twitter_authentication(authentication_path)
+api = twitter_authentication(authentication_path, proxies['US'])
+
 
 # %% [markdown]
 # # Load Twitter Usernames   

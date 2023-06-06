@@ -160,35 +160,79 @@ df_to_parquet(df = df_all_prob_norm,
           folder = f'./data/transformed/twitter', 
           file = f'/cleaned_twitter_ngram_norm.parquet')
 
-# %% Merge Users on same dates
-df_wide1 = df_all_prob_norm.pivot_table(index='date', 
+# %% Merge Users by day
+df_wide1_byday = df_all_prob_norm.pivot_table(index='date', 
                                    values=['favorite_count','retweet_count'], 
                                    aggfunc='sum',
                                    fill_value=0).sort_values(by='date',
                                                             ascending=False)
-df_wide2 = df_all_prob_norm.pivot_table(index='date', 
+# seperate merge to append type of probability to each user
+df_wide2_byday = df_all_prob_norm.pivot_table(index='date', 
                                    columns=['user'],
                                    values=['unigram_probability','bigram_probability'], 
                                    aggfunc={'unigram_probability': 'sum',
                                             'bigram_probability': 'sum'},
                                    fill_value=0 ).sort_values(by='date',
                                                               ascending=False)#.droplevel(0, axis=1) 
-df_wide2.columns = pd.Series(['_'.join(str(s).strip() for s in col if s) for col in df_wide2.columns]).str.replace("probability_", "", regex=True)
-df_wide = pd.merge(df_wide1, df_wide2, how='inner', on='date').reset_index()
-df_to_parquet(df = df_wide, 
+df_wide2_byday.columns = pd.Series(['_'.join(str(s).strip() for s in col if s) for col in df_wide2_byday.columns]).str.replace("probability_", "", regex=True)
+df_wide_byday = pd.merge(df_wide1_byday, df_wide2_byday, how='inner', on='date').reset_index()
+df_to_parquet(df = df_wide_byday, 
           folder = f'./data/transformed/twitter', 
-          file = f'/pivot_user_by_date.parquet')
+          file = f'/pivot_user_byday.parquet')
 
+# merge users by hour
+df_all_prob_norm_byhour = df_all_prob_norm.loc[:,['user','created_at', 'favorite_count', 'retweet_count', 'unigram_probability', 'bigram_probability']]
+df_all_prob_norm_byhour.created_at = pd.to_datetime(df_all_prob_norm.created_at.dt.tz_localize(None))
+sum_columns = ['favorite_count', 'retweet_count', 'unigram_probability', 'bigram_probability']
+n = len(sum_columns)
+aggregation = dict(zip(sum_columns,['sum']*n))
+# aggregate every 30 minutes to match 13:30-21:00 UTC stock market hours 9:30-4PM
+df_all_prob_norm_byhour = df_all_prob_norm_byhour.groupby(['user',pd.Grouper(key="created_at",freq="30min")]).agg(aggregation).reset_index()
+
+df_wide1_byhour = df_all_prob_norm_byhour.pivot_table(index='created_at', 
+                                   values=['favorite_count','retweet_count'], 
+                                   aggfunc='sum',
+                                   fill_value=0).sort_values(by='created_at',
+                                                            ascending=False)
+# seperate merge to append type of probability to each user e.g., CNN_unigram, CNN_bigram
+df_wide2_byhour = df_all_prob_norm_byhour.pivot_table(index='created_at', 
+                                   columns=['user'],
+                                   values=['unigram_probability','bigram_probability'], 
+                                   aggfunc={'unigram_probability': 'sum',
+                                            'bigram_probability': 'sum'},
+                                   fill_value=0 ).sort_values(by='created_at',
+                                                              ascending=False)
+df_wide2_byhour.columns = pd.Series(['_'.join(str(s).strip() for s in col if s) for col in df_wide2_byhour.columns]).str.replace("probability_", "", regex=True)
+df_wide_byhour = pd.merge(df_wide1_byhour, df_wide2_byhour, how='inner', on='created_at').reset_index()
+df_to_parquet(df = df_wide_byhour, 
+          folder = f'./data/transformed/twitter', 
+          file = f'/pivot_user_byhour.parquet')
 # %% [markdown]
-# - To combine Sat/Sun Tweets with Monday
-week_end_mask = df_wide.date.dt.day_name().isin(['Saturday', 'Sunday', 'Monday'])
-week_end = df_wide.loc[week_end_mask, :]
+# - To combine Sat/Sun Tweets with Monday 
+# by day
+week_end_mask = df_wide_byday.date.dt.day_name().isin(['Saturday', 'Sunday', 'Monday'])
+week_end = df_wide_byday.loc[week_end_mask, :]
 monday_group = week_end.groupby([pd.Grouper(key='date', freq='W-MON')]).sum().reset_index('date')
 # Apply the stripped mask
-df_wide_stripped = df_wide.reset_index(drop=True).loc[~ week_end_mask, :]
-df_wide_wknd_merge = pd.merge(df_wide_stripped, monday_group, how='outer').set_index('date').sort_index(ascending=False).reset_index()
-# %%
-df_to_parquet(df = df_wide_wknd_merge, 
+df_wide_stripped = df_wide_byday.reset_index(drop=True).loc[~ week_end_mask, :]
+df_wide_wknd_merge_byday = pd.merge(df_wide_stripped, monday_group, how='outer').set_index('date').sort_index(ascending=False).reset_index()
+# export
+df_to_parquet(df = df_wide_wknd_merge_byday, 
           folder = f'./data/transformed/twitter', 
-          file = f'/pivot_user_by_date_wkd_merge.parquet')
+          file = f'/pivot_user_wkd_merge_byday.parquet')
+
+# - To combine Sat/Sun Tweets with Monday 
+# by hour
+week_end_mask = df_wide_byhour.created_at.dt.day_name().isin(['Saturday', 'Sunday', 'Monday'])
+week_end = df_wide_byhour.loc[week_end_mask, :]
+monday_group = week_end.groupby([pd.Grouper(key='created_at', freq='W-MON')]).sum().reset_index('created_at')
+# Apply the stripped mask
+df_wide_stripped_byhour = df_wide_byhour.reset_index(drop=True).loc[~ week_end_mask, :]
+df_wide_wknd_merge_byhour = pd.merge(df_wide_stripped_byhour, monday_group, how='outer').set_index('created_at').sort_index(ascending=False).reset_index().rename(columns={'created_at':'date'})
+# df_wide_wknd_merge_byhour['created_at'] = df_wide_wknd_merge_byhour
+# export
+df_to_parquet(df = df_wide_wknd_merge_byhour, 
+          folder = f'./data/transformed/twitter', 
+          file = f'/pivot_user_wkd_merge_byhour.parquet')
+df_wide_wknd_merge_byhour
 # %%
