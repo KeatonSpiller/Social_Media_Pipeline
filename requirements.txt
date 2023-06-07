@@ -18,6 +18,7 @@ sqlalchemy-mate == 1.4.28.3
 # extraction
 tweepy == 4.12.1 # twitter
 yfinance >= 0.2.18 # financial stocks
+facebook-scraper ==0.2.59 # facebook
 
 # cleaning
 regex == 2021.8.28
