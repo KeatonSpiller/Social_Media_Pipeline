@@ -1,6 +1,10 @@
+# %%
 # Load Libraries
 import os, sys, pandas as pd, time
 from facebook_scraper import *
+import facebook
+import browser_cookie3
+# from facebook import user_posts
 
 # %% [markdown]
 # - Change Directory to top level folder
@@ -20,18 +24,24 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
 
 # import local files
 from extract_facebook_tools import *
-
+# %%
 # If credentials are needed
-# access_credentials = pd.read_csv(f'./credentials/facebook.csv')
-# access_token,app_token = access_credentials[0],access_credentials[1]
+# access_credentials = pd.read_csv(f'./credentials/facebook.csv', header=0)
+# access_token,app_token = access_credentials.access_token,access_credentials.app_token
+# graph = facebook.GraphAPI(access_token=access_token)
 
 with open(os.path.normpath(os.getcwd() + '/user_input/facebook_users.xlsx'), 'rb') as f:
     user_df = pd.read_excel(f, sheet_name='user_names')
     user_df = user_df.where(pd.notnull(user_df), '')
     f.close()
 facebook_groups = list(user_df.columns)
-         
+
 # %% [markdown]
+# cookies (automated or maunal)
+cookies = browser_cookie3.chrome(domain_name='.facebook.com')
+# cookies=f"./credentials/facebook_cookies.txt"
+
+# %%
 # Download facebook posts
 for group in facebook_groups:
     print(f"\n{group}:\n")
@@ -39,24 +49,37 @@ for group in facebook_groups:
     users = list(user_df[group][user_df[group]!= ''])
     
     folder = f'./data/extracted/raw/facebook/{group}'
-    options = {"comments": True, "reactors": True, "progress": True, "posts_per_page": 200}
+    options = {"comments": True, "reactors": True,\
+               'HQ_images': False,'allow_extra_requests': False}
+    
+    start_url = None
+    def handle_pagination_url(url):
+        global start_url
+        start_url = url
+    # pages=None
     for user in users:
-        posts = []
-        for post in get_posts(account=f'{user}',
-                              extra_info = True,
-                              cookies=f"./credentials/facebook_cookies.txt",
-                              pages=100,
-                              options = options):
-            time.sleep(20)
-            posts.append(post)
-        df  = pd.DataFrame(posts, 
-                           engine='pyarrow',
-                           dtype_backend = 'pyarrow')
+        print(f"{user}\n")
+        try:
+            posts = []
+            for post in get_posts(account=f'{user}',
+                                extra_info = True,
+                                cookies=cookies,
+                                page_limit=None, 
+                                start_url=start_url,
+                                request_url_callback=handle_pagination_url):
+                time.sleep(10)
+                posts.append(post)
+            df  = pd.DataFrame(posts)
+            
+            print(df)
+            df_to_parquet(df=df, 
+                        folder=folder, 
+                        file=f'/{user}.parquet')
+            print(f"")
         
-        print(df)
-        df_to_parquet(df=df, 
-                      folder=folder, 
-                      file=f'/{user}.parquet')
-        print(f"")
+        except exceptions.TemporarilyBanned:
+            print("Temporarily banned, sleeping for 10m")
+            time.sleep(600)
 print('Facebook user download complete')
+
 # %%
