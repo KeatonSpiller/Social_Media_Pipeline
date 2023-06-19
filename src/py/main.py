@@ -88,27 +88,41 @@ def main():
     @app.route("/etl", methods=["POST"])
     def etl():
         if(request.method == 'POST'):
-            data = request.form
-            if 'extract_twitter' in data:
-                print("Extract Twitter")
-                import extract_twitter
-            elif 'transform_twitter' in data:
-                print("transform_twitter")
-                import transform_twitter
-            elif 'extract_stocks' in data:
-                print("Extract Stocks")
-                import extract_stocks
-            elif 'load_mysql_twitter_extract' in data:
-                print("load raw twitter to MYSQL")
-                import load_extract
-            elif 'load_mysql_twitter_transform' in data:
-                print("load raw twitter to MYSQL")
-                # import load_extract
-            elif 'stock_prediction' in data:
-                print("stock_prediction")
-                import stock_prediction
-            else:
-                print("neither") # unknown
+            data = list(request.form)[0]
+            match data:
+                case 'extract_twitter':
+                    print("Extract Twitter")
+                    import extract_twitter
+                case 'transform_twitter':
+                    print("transform_twitter")
+                    import transform_twitter
+                case 'extract_stocks':
+                    print("Extract Stocks")
+                    import extract_stocks
+                case 'load_mysql_twitter_extract':
+                    print("load raw twitter to MYSQL")
+                    import load_extract
+                case 'load_mysql_twitter_transform':
+                    print("load transfomred twitter to MYSQL")
+                    # import load_extract
+                case 'stock_prediction':
+                    print("stock_prediction")
+                    import stock_prediction
+                case 'run_all':
+                    print(f"Run All\n****************************************************************\n")
+                    print("Extract Twitter", end="\n")
+                    import extract_twitter
+                    print("transform_twitter", end="\n")
+                    import transform_twitter
+                    print("Extract Stocks", end="\n")
+                    import extract_stocks
+                    print("load raw twitter to MYSQL", end="\n")
+                    import load_extract
+                    print("stock_prediction", end="\n")
+                    import stock_prediction 
+                case _:
+                    print("neither", end="\n") # unknown
+
         return render_template("index.html")
     
     @app.route("/opendatafolder", methods=["POST"])
