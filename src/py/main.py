@@ -94,10 +94,10 @@ def main():
                     print("Extract Twitter")
                     import extract_twitter
                 case 'transform_twitter':
-                    print("transform_twitter")
+                    print("Transform Twitter\n")
                     import transform_twitter
                 case 'extract_stocks':
-                    print("Extract Stocks")
+                    print("Extract Stocks\n")
                     import extract_stocks
                 case 'load_mysql_twitter_extract':
                     print("load raw twitter to MYSQL")

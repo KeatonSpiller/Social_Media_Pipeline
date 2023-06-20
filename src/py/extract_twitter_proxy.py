@@ -28,7 +28,7 @@ if(os.getcwd().split(os.sep)[-1] != top_level_folder):
   
 # %% [markdown]
 ## Load Custom Functions
-from extract_twitter_tools_proxy import user_download, twitter_authentication, merge_tweets
+from extract_twitter_proxy_tools import user_download, twitter_authentication, merge_tweets
 
 # %% [markdown]
 # # Twitter API Credentials
