@@ -57,6 +57,44 @@ def main():
                     subprocess.Popen(f"explorer {file}")
         return render_template("index.html")
     
+    @app.route("/twitterkey", methods=["GET","POST"])
+    def twitterkey():
+        folder = os.path.normpath('./credentials')
+        file = os.path.normpath('./credentials/twitter.csv')
+        if(request.method == 'POST'):
+            print("Add Twitter Key's")
+            
+            # check if credential folder exits
+            if(os.path.exists(folder)):
+                pass
+            else:
+                os.mkdir(folder)
+            if(os.path.exists(file)): 
+                pass
+            else:                
+                tokens = ['consumer_key','consumer_secret','access_token','access_token_secret','beaker_token']
+                df = pd.DataFrame([[""]*len(tokens)], columns=tokens)
+                df.to_csv(file, index=False)
+                
+            df = pd.read_csv(file, header=0)
+            key_type = list(request.form)[0]
+            key_value = request.form[key_type]
+            match key_type:
+                case 'consumer_key': 
+                    df['consumer_key'][0] = key_value 
+                case 'consumer_secret': 
+                    df['consumer_secret'][0] = key_value 
+                case 'access_token': 
+                    df['access_token'][0] = key_value 
+                case 'access_token_secret': 
+                    df['access_token_secret'][0] = key_value       
+                case 'beaker_token': 
+                    df['beaker_token'][0] = key_value  
+                    
+            df.to_csv(file, index=False)        
+            
+        return render_template("index.html")
+    
     @app.route("/userupload", methods=["POST"])
     def userupload():
     
@@ -112,13 +150,13 @@ def main():
                     print(f"Run All\n****************************************************************\n")
                     print("Extract Twitter", end="\n")
                     import extract_twitter
-                    print("transform_twitter", end="\n")
+                    print("Transform Twitter", end="\n")
                     import transform_twitter
                     print("Extract Stocks", end="\n")
                     import extract_stocks
-                    print("load raw twitter to MYSQL", end="\n")
-                    import load_extract
-                    print("stock_prediction", end="\n")
+                    # print("load raw twitter to MYSQL", end="\n")
+                    # import load_extract
+                    print("Stock Prediction", end="\n")
                     import stock_prediction 
                 case _:
                     print("neither", end="\n") # unknown

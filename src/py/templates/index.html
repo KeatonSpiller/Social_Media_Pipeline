@@ -1,5 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
+    <!--  Load CSS in Flask with html-->
+    <link href="mystyle.css" rel="stylesheet" type="text/css" />
+    <!--  Load JavaScript in Flask with html-->
+    <!-- <script>
+        alert("Welcome to Social Media Platform!")
+    </script> -->
+
     <body style="background-color:#d9dee0;">
     <head>
         <meta charset="UTF-8">
@@ -14,25 +22,12 @@
         }
         </style>
         <center>
-        <h1>Social Media Pipeline </h1>
+        <h1><u>Social Media Pipeline</u> </h1>
         </center>
     </head>
     <center>
         <body>
-
-            <body>
-                <form action="/openuserfolder" method ="post">
-                    &emsp;
-                    <button 
-                    type="submit"
-                    onclick="toggle();"
-                    style="background: rgb(195, 169, 39);color:white;"  
-                    name="openuserfolder" 
-                    value="openuserfolder"> Open User Input </button>
-                    <h3></h3>
-                </form> 
-            </body>
-
+            
             <body>
                 <form action="/opencredfolder" method ="post">
                     &emsp;
@@ -41,7 +36,34 @@
                     onclick="toggle();"
                     style="background: rgb(195, 169, 39);color:white;"  
                     name="opencredfolder" 
-                    value="opencredfolder"> Open Credential Input </button>
+                    value="opencredfolder"> Open Credential Input Folder</button>
+                    <h3></h3>
+                </form> 
+            </body>
+
+            <a href="https://developer.twitter.com/en/portal/projects-and-apps">Create Twitter APP</a>
+            <h3></h3>
+            <body>
+                <form action="/twitterkey" method ="post">
+
+                    <p>Consumer Key <input type = "text" name = "consumer_key" /></p>
+                    <p>Consumer Secret <input type = "text" name = "consumer_secret" /></p>
+                    <p>Authentication Access Token <input type = "text" name = "access_token" /></p>
+                    <p>Authentication Access Token Secret <input type = "text" name = "access_token_secret" /></p>
+
+                    &emsp;
+
+                </form> 
+            </body>
+            <body>
+                <form action="/openuserfolder" method ="post">
+                    &emsp;
+                    <button 
+                    type="submit"
+                    onclick="toggle();"
+                    style="background: rgb(195, 169, 39);color:white;"  
+                    name="openuserfolder" 
+                    value="openuserfolder"> Open User Input Folder </button>
                     <h3></h3>
                 </form> 
             </body>
@@ -96,7 +118,7 @@
                     onclick="toggle();"
                     style="background: rgb(0, 83, 139);color:white;"  
                     name="extract_twitter" 
-                    value="extract_twitter"> 1. extract twitter </button>
+                    value="extract_twitter"> 1. Extract Twitter </button>
 
                     &emsp;
                     <button 
@@ -104,7 +126,7 @@
                     onclick="toggle();"
                     style="background: rgb(0, 83, 139);color:white;"  
                     name="transform_twitter" 
-                    value="transform_twitter"> 2. transform twitter </button>
+                    value="transform_twitter"> 2. Transform Twitter </button>
                     <h3></h3>
 
                     &emsp;
@@ -113,7 +135,7 @@
                     onclick="toggle();"
                     style="background: rgb(0, 83, 139);color:white;"  
                     name="load_mysql_twitter_extract" 
-                    value="load_mysql_twitter_extract"> 3. load mysql twitter extract </button>
+                    value="load_mysql_twitter_extract"> 3. Load mysql Twitter Extract </button>
                     
                     &emsp;
                     <button 
@@ -121,7 +143,7 @@
                     onclick="toggle();"
                     style="background: rgb(0, 83, 139);color:white;"  
                     name="load_mysql_twitter_transform" 
-                    value="load_mysql_twitter_transform"> 4. load mysql Twitter transform </button>
+                    value="load_mysql_twitter_transform"> 4. Load mysql Twitter Transform </button>
                     <h3></h3>
 
                     &emsp;
@@ -130,7 +152,7 @@
                     onclick="toggle();"
                     style="background: rgb(0, 83, 139);color:white;"  
                     name="extract_stocks" 
-                    value="extract_stocks"> 5. extract and transform stocks </button>
+                    value="extract_stocks"> 5. Extract and Transform Stocks </button>
                     <h3></h3>
 
 
@@ -140,7 +162,7 @@
                     onclick="toggle();"
                     style="background: rgb(0, 139, 42);color:white;"  
                     name="stock_prediction" 
-                    value="stock_prediction"> 6. stock prediction </button>
+                    value="stock_prediction"> 6. Stock Prediction </button>
                     <h3></h3>
 
                 </form> 

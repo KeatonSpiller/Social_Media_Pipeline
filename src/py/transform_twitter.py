@@ -303,16 +303,19 @@ wkd_merge_by_five_minutes = merge_days(df = df_wide_by_five_minutes,
 
 def merge_hours(df, start, end, index, file, folder):
     
+    # Merge outside working hours with next opening day
     start_split, end_split = start.split(':'), end.split(':')
     start_hour, start_minute, end_hour, end_minute = int(start_split[0]), int(start_split[1]), int(end_split[0]), int(end_split[1])
     
     # localize to 'UTC' to be safe
-    df[index] = pd.to_datetime(wkd_merge_by_halfhour[index].dt.tz_localize('UTC'))
+    df[index] = pd.to_datetime(df[index].dt.tz_localize('UTC'))
     # df[index] = pd.DatetimeIndex(df[index]) # pyarrow to DatetimeIndex required for between_time
     df = df.set_index(index)
     wrk_hours = df.between_time(start_time= start, end_time= end).reset_index()
     after_wrk = df.between_time(start_time= start, end_time= '23:59').groupby(pd.Grouper(freq='D')).sum().reset_index()
     before_wrk = df.between_time(start_time= '0:00', end_time= end).groupby(pd.Grouper(freq='D')).sum().reset_index()
+    
+    # wrk_hours_shifted = wrk_hours.set_index(index).shift(periods=-1)
     
     before_wrk[index] = before_wrk[index].apply(lambda x:x.replace(hour=start_hour,minute=start_minute))
     after_wrk[index] = after_wrk[index].apply(lambda x:x.replace(hour=end_hour,minute=end_minute))
@@ -327,12 +330,13 @@ def merge_hours(df, start, end, index, file, folder):
     df_to_parquet(df = df, 
             folder = folder, 
             file = file)
+    print(wrk_hours_shifted, wrk_hours)
     
-# Working Hours Merge of Stock Market (9:30-4PM EST -> 6:30-1:00PM PST -> 13:30-20:00 UTC)
+# stock market hours = (9:30-4PM EST -> 6:30-1:00PM PST -> 13:30-20:00 UTC)
 # ***** BY HOUR *****
 merge_hours(df=wkd_merge_byhour.copy(),
             start='13:30', 
-            end='20:00',
+            end='19:30',
             index='created_at',
             file=f'/pivot_user_wkd_merge_byhour_wrkhrs.parquet',
             folder=f'./data/transformed/twitter')
@@ -350,5 +354,4 @@ merge_hours(df=wkd_merge_by_five_minutes.copy(),
             index='created_at',
             file=f'/pivot_user_wkd_merge_by_five_min_wrkhrs.parquet',
             folder=f'./data/transformed/twitter')
-
 # %%
