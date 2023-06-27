@@ -8,7 +8,8 @@
 
 # %% [markdown]
 # - Import Libraries
-import os, pandas as pd, numpy as np, string, sys, nltk
+from collections import defaultdict
+import os, pandas as pd, numpy as np, string, sys, nltk, re
 from gensim.models import Word2Vec, KeyedVectors
 # import skfda # fuzzy c-means
 pd.set_option('display.float_format', str)
@@ -63,7 +64,7 @@ twitter_df = pd.read_parquet('./data/extracted/merged/twitter/all_twitter.parque
 # %% [markdown]
 # - Cleaning up tweet sentences -> websites(html/www) -> usernames | hashtags | digits -> extra spaces | stopwords | emoji
 # - punctuation (texthero) -> translate to english (in development) -> stemming similar words (e.g.. ['like' 'liked' 'liking'] to ['lik' 'lik' 'lik'])
-# %%
+
 cleaned_stem_text, cleaned_nonstem_text = clean_text(twitter_df.text, words_to_remove)
 cleaned_df = twitter_df.copy()
 
@@ -160,7 +161,8 @@ df_to_parquet(df = df_all_prob_norm,
           folder = f'./data/transformed/twitter', 
           file = f'/cleaned_twitter_ngram_norm.parquet')
 
-# %% Wide pivot Users by day
+# %% 
+# Wide pivot Users by day
 
 def wide_pivot_byuser(df, index, probabilities, file, folder, other_numeric=None, agg='sum'):
     
@@ -191,28 +193,55 @@ def wide_pivot_byuser(df, index, probabilities, file, folder, other_numeric=None
 other_numeric = ['favorite_count','retweet_count']
 probability_types = [match for match in list(df_all_prob_norm.columns) if "probability" in match]
 
-df_wide_byday = wide_pivot_byuser(df = df_all_prob_norm, 
+df_wide_byday = wide_pivot_byuser(df = df_all_prob_norm.copy(), 
                   index='date', 
                   probabilities = probability_types,
                   file = f'/pivot_user_byday.parquet',
                   folder = f'./data/transformed/twitter',
                   other_numeric = other_numeric,
                   agg = 'sum')
+# created_at is currently timestamp[us, tz=UTC][pyarrow]
 
 # %%
 # merge by frequency
+
 def frequency_merge(df, numeric_columns, freq="30min", agg='sum', index='created_at', offset=None):
+    
     all_columns = numeric_columns + ['user', index]
-    df[index] = pd.to_datetime(df[index].dt.tz_localize(None))
+    df[index] = pd.to_datetime(df[index])
     aggregation = dict(zip(numeric_columns,[agg]*len(numeric_columns)))
     df = df.loc[:,all_columns]
     # group by numeric values
-    df = df.groupby(['user', pd.Grouper(key=index, freq=freq, offset=offset)]).agg(aggregation).reset_index()
+    df = df.groupby(['user', pd.Grouper(key=index, 
+                                        freq=freq, 
+                                        dropna=False, 
+                                        offset=offset)]).agg(aggregation).reset_index()
+    return df
+
+def frequency_fill(df, freq, fill, index):
+    
+    # Fill All Dates
+    df = df.set_index(index).asfreq(freq=freq, fill_value=fill).reset_index()
+    return df
+
+def fill_time(df, freq, hour, minute, fill, index):
+    
+    # Fill Opening Hour Dates
+    start = df[index].min().normalize().replace(hour=hour,minute=minute)
+    end = df[index].max().normalize().replace(hour=hour,minute=minute)
+    # every twitter timestamp 
+    all_days = df.set_index(index).index
+    # twitter timestamps for Opening Hours
+    start_days = pd.date_range(start=start, end=end, freq=freq, name=index)
+    filled_index = all_days.union(start_days)
+    
+    df = df.set_index(index).reindex(filled_index).fillna(fill).reset_index()
+    
     return df
 
 numeric_columns = probability_types + other_numeric
 # ***** BY HOUR *****
-df_all_prob_norm_byhour = frequency_merge(df=df_all_prob_norm, 
+df_all_prob_norm_byhour = frequency_merge(df=df_all_prob_norm.copy(), 
                                           numeric_columns = numeric_columns, 
                                           freq="H", 
                                           agg='sum', 
@@ -225,8 +254,11 @@ df_wide_byhour = wide_pivot_byuser(df = df_all_prob_norm_byhour,
                                         folder = f'./data/transformed/twitter',
                                         other_numeric = other_numeric,
                                         agg = 'sum')
+
+df_wide_byhour = fill_time(df_wide_byhour, freq="D", hour=13, minute=30, fill=0, index ='created_at')
+# print(df_wide_byhour.created_at.dt.date.value_counts())
 # ***** BY HALF HOUR *****
-df_all_prob_norm_by_halfhour = frequency_merge(df=df_all_prob_norm, 
+df_all_prob_norm_by_halfhour = frequency_merge(df=df_all_prob_norm.copy(), 
                                           numeric_columns = numeric_columns, 
                                           freq="30min", 
                                           agg='sum', 
@@ -238,8 +270,9 @@ df_wide_by_halfhour = wide_pivot_byuser(df = df_all_prob_norm_by_halfhour,
                                         folder = f'./data/transformed/twitter',
                                         other_numeric = other_numeric,
                                         agg = 'sum')
+df_wide_by_halfhour = fill_time(df_wide_by_halfhour, freq="D", hour=13, minute=30, fill=0, index ='created_at')
 # ***** BY five MINUTES *****
-df_all_prob_norm_by_five_minutes = frequency_merge(df=df_all_prob_norm, 
+df_all_prob_norm_by_five_minutes = frequency_merge(df=df_all_prob_norm.copy(), 
                                           numeric_columns = numeric_columns, 
                                           freq="5min", 
                                           agg='sum', 
@@ -251,107 +284,189 @@ df_wide_by_five_minutes = wide_pivot_byuser(df = df_all_prob_norm_by_five_minute
                                         folder = f'./data/transformed/twitter',
                                         other_numeric = other_numeric,
                                         agg = 'sum')
-
+df_wide_by_five_minutes = fill_time(df_wide_by_five_minutes, freq="D", hour=13, minute=30, fill=0, index ='created_at')
+# ***** BY MINUTE *****
+df_all_prob_norm_by_minute = frequency_merge(df=df_all_prob_norm.copy(), 
+                                          numeric_columns = numeric_columns, 
+                                          freq="1min", 
+                                          agg='sum', 
+                                          index='created_at')
+df_wide_by_minute = wide_pivot_byuser(df = df_all_prob_norm_by_minute, 
+                                        index='created_at', 
+                                        probabilities = probability_types,
+                                        file = f'/pivot_user_by_minute.parquet',
+                                        folder = f'./data/transformed/twitter',
+                                        other_numeric = other_numeric,
+                                        agg = 'sum')
+df_wide_by_minute = frequency_fill(df = df_wide_by_minute.copy(), 
+                                   freq = '1min', 
+                                   fill=0, 
+                                   index='created_at')
 # %% [markdown]
 # Combine Weekend Data
-def merge_days(df, merge_days, merge_freq_on, index, file, folder):
+
+def merge_days(df, merge_days, merge_freq_on, index, file, folder, offset=None):
     mask = df[index].dt.day_name().isin(merge_days)
     selected_days = df.loc[mask, :]
-    merged_selection = selected_days.groupby([pd.Grouper(key=index, freq=merge_freq_on)]).sum().reset_index(index)
+    
+    # Days over the weekend
+    merged_selection = selected_days.groupby([pd.Grouper(key=index, 
+                                                        freq=merge_freq_on, 
+                                                        dropna=False, 
+                                                        offset=offset)]).sum().reset_index(index)
     # Combine Days e.g.( Mon = Mon+Sat+Sun )
     df_other_days = df.reset_index(drop=True).loc[~ mask, :]
     df_output = pd.merge(df_other_days, merged_selection, how='outer').set_index(index).sort_index(ascending=False).reset_index()
+    
+    df_to_parquet(df = df_output, 
+                  folder = folder, 
+                  file = file)
+    return df_output
+
+def merge_days_byhour(df, merge_days, merge_freq_on, hour, minute, index, file, folder, offset=None):
+    
+    # Days in Sat Sun
+    mask = df[index].dt.day_name().isin(merge_days)
+    selected_days = df.loc[mask, :]
+    
+    # Merged Sat + Sun  = Mon
+    merged_selection = selected_days.groupby([pd.Grouper(key=index, 
+                                                        freq=merge_freq_on)]).sum().reset_index(index)
+    # Changed hours to Opening Hours
+    merged_selection[index] = merged_selection[index].apply(lambda x:x.replace(hour=hour,minute=minute))
+    
+    # All other Days Mon-Fri
+    df_other_days = df.reset_index(drop=True).loc[~ mask, :]
+
+    # Merge Mon-Fri with Sat+Sun=Mon
+    # monday_merge = pd.merge(merged_selection, df_other_days, on=index, how='outer')
+    monday_merge = pd.concat([merged_selection.set_index(index), df_other_days.set_index(index)])
+    
+    # Sum Sat+Sun with Monday
+    df_output = monday_merge.groupby(index).sum().sort_index(ascending=False).reset_index()
+    
     df_to_parquet(df = df_output, 
                   folder = folder, 
                   file = file)
     return df_output
 
 # Weekend Merge (Mon = Sat+Sun+Mon Tweets )
-weekend = ['Saturday', 'Sunday', 'Monday']
-weekday_monday = 'W-MON'
-
 # ***** BY DAY *****
-wkd_merge_byday = merge_days(df = df_wide_byday,
-                            merge_days = weekend, 
-                            merge_freq_on= weekday_monday,
+wkd_merge_byday = merge_days(df = df_wide_byday.copy(),
+                            merge_days = ['Saturday', 'Sunday', 'Monday'], 
+                            merge_freq_on= 'W-MON',
                             index= 'date',
                             file=f'/pivot_user_wkd_merge_byday.parquet',
                             folder=f'./data/transformed/twitter')
 # ***** BY HOUR *****
-wkd_merge_byhour = merge_days(df = df_wide_byhour,
-                                    merge_days = weekend, 
-                                    merge_freq_on= weekday_monday,
-                                    index= 'created_at',
-                                    file=f'/pivot_user_wkd_merge_byhour.parquet',
-                                    folder=f'./data/transformed/twitter')
+wkd_merge_byhour = merge_days_byhour(  df = df_wide_byhour.copy(),
+                                merge_days = ['Saturday', 'Sunday'], 
+                                merge_freq_on= 'W-MON',
+                                hour = 13,
+                                minute= 30,
+                                index= 'created_at',
+                                file=f'/pivot_user_wkd_merge_byhour.parquet',
+                                folder=f'./data/transformed/twitter')
 # ***** BY HALF HOUR *****
-wkd_merge_by_halfhour = merge_days(df = df_wide_by_halfhour,
-                                    merge_days = weekend, 
-                                    merge_freq_on= weekday_monday,
+wkd_merge_by_halfhour = merge_days_byhour(df = df_wide_by_halfhour.copy(),
+                                    merge_days = ['Saturday', 'Sunday'], 
+                                    merge_freq_on= 'W-MON',
+                                    hour = 13,
+                                    minute= 30,
                                     index= 'created_at',
                                     file=f'/pivot_user_wkd_merge_by_halfhour.parquet',
                                     folder=f'./data/transformed/twitter')
 # ***** BY FIVE MINUTES *****
-wkd_merge_by_five_minutes = merge_days(df = df_wide_by_five_minutes,
-                                    merge_days = weekend, 
-                                    merge_freq_on= weekday_monday,
+wkd_merge_by_five_minutes = merge_days_byhour(df = df_wide_by_five_minutes.copy(),
+                                    merge_days = ['Saturday', 'Sunday'], 
+                                    merge_freq_on= 'W-MON',
+                                    hour = 13,
+                                    minute= 30,
                                     index= 'created_at',
                                     file=f'/pivot_user_wkd_merge_by_five_minutes.parquet',
+                                    folder=f'./data/transformed/twitter')
+# ***** BY MINUTE *****
+wkd_merge_by_minute = merge_days_byhour(df = df_wide_by_minute.copy(),
+                                    merge_days = ['Saturday', 'Sunday'], 
+                                    merge_freq_on= 'W-MON',
+                                    hour = 13,
+                                    minute= 30,
+                                    index= 'created_at',
+                                    file=f'/pivot_user_wkd_merge_by_minute.parquet',
                                     folder=f'./data/transformed/twitter')
 # %% [markdown]
 # Working Hour Range Merge
 
-def merge_hours(df, start, end, index, file, folder):
-    
-    # Merge outside working hours with next opening day
-    start_split, end_split = start.split(':'), end.split(':')
-    start_hour, start_minute, end_hour, end_minute = int(start_split[0]), int(start_split[1]), int(end_split[0]), int(end_split[1])
-    
-    # localize to 'UTC' to be safe
-    df[index] = pd.to_datetime(df[index].dt.tz_localize('UTC'))
-    # df[index] = pd.DatetimeIndex(df[index]) # pyarrow to DatetimeIndex required for between_time
-    df = df.set_index(index)
-    wrk_hours = df.between_time(start_time= start, end_time= end).reset_index()
-    after_wrk = df.between_time(start_time= start, end_time= '23:59').groupby(pd.Grouper(freq='D')).sum().reset_index()
-    before_wrk = df.between_time(start_time= '0:00', end_time= end).groupby(pd.Grouper(freq='D')).sum().reset_index()
-    
-    # wrk_hours_shifted = wrk_hours.set_index(index).shift(periods=-1)
-    
-    before_wrk[index] = before_wrk[index].apply(lambda x:x.replace(hour=start_hour,minute=start_minute))
-    after_wrk[index] = after_wrk[index].apply(lambda x:x.replace(hour=end_hour,minute=end_minute))
+def merge_hours(df, day_start, day_end, wrk_start, wrk_end, hour, minute, index, file, folder):
 
-    after_mask = wrk_hours[index].isin(after_wrk[index])
-    wrk_hours.loc[after_mask,:] = after_wrk
-
-    before_mask = wrk_hours[index].isin(before_wrk[index])
-    wrk_hours.loc[before_mask,:] = before_wrk
-    df = wrk_hours.astype({index:'timestamp[us][pyarrow]'})
+    # UST to EST timezone ( Merge on the correct days )
+    df[index] = pd.to_datetime(df[index].dt.tz_convert('America/New_York'))
     
-    df_to_parquet(df = df, 
+    # Tweets split up by hours of the day
+    wrk_hours = df.set_index(index).between_time(start_time= wrk_start, end_time= wrk_end).reset_index()
+    before_wrk = df.set_index(index).between_time(start_time= day_start, end_time= wrk_start).groupby(pd.Grouper(freq='D')).sum().reset_index()
+    after_wrk = df.set_index(index).between_time(start_time= wrk_end, end_time= day_end).groupby(pd.Grouper(freq='D')).sum().reset_index()
+    
+    # Merge before work hours with opening hour
+    before_wrk[index] = before_wrk[index].apply(lambda x:x.replace(hour=hour,minute=minute))
+    wrk_hrs_merge = pd.concat([wrk_hours, before_wrk]).groupby(index).sum()
+
+    # Merge after work hours with next day opening hour
+    after_wrk[index] = after_wrk[index].apply(lambda x:x.replace(hour=hour,minute=minute))
+    after_wrk_shifted= after_wrk.set_index(index).shift(freq='D', periods=-1)
+    wrk_hrs_merge = pd.concat([wrk_hrs_merge, after_wrk_shifted])
+    wrk_hrs_merge = wrk_hrs_merge.groupby(index).sum().reset_index()
+
+    wrk_hrs_merge = wrk_hrs_merge.set_index(index).astype('float64[pyarrow]').reset_index()
+    wrk_hrs_merge[index] = wrk_hrs_merge[index].dt.tz_convert('America/New_York')
+    wrk_hrs_merge = wrk_hrs_merge.rename(columns={index:'timestamp'})
+    
+    df_to_parquet(df = wrk_hrs_merge, 
             folder = folder, 
             file = file)
-    print(wrk_hours_shifted, wrk_hours)
-    
 # stock market hours = (9:30-4PM EST -> 6:30-1:00PM PST -> 13:30-20:00 UTC)
-# ***** BY HOUR *****
+# # ***** BY HOUR *****
 merge_hours(df=wkd_merge_byhour.copy(),
-            start='13:30', 
-            end='19:30',
+            day_start ='00:00',
+            wrk_start = '09:30',
+            wrk_end = '15:30',
+            day_end = '23:59',
+            hour = 9,
+            minute = 30,
             index='created_at',
             file=f'/pivot_user_wkd_merge_byhour_wrkhrs.parquet',
             folder=f'./data/transformed/twitter')
 # ***** BY HALF HOUR *****
 merge_hours(df=wkd_merge_by_halfhour.copy(),
-            start='13:30', 
-            end='20:00',
+            day_start ='00:00',
+            wrk_start = '09:30',
+            wrk_end = '15:30',
+            day_end = '23:59',
+            hour = 9,
+            minute = 30,
             index='created_at',
             file=f'/pivot_user_wkd_merge_by_halfhour_wrkhrs.parquet',
             folder=f'./data/transformed/twitter')
 # ***** BY FIVE MINUTES *****
 merge_hours(df=wkd_merge_by_five_minutes.copy(),
-            start='13:30', 
-            end='20:00',
+            day_start ='00:00',
+            wrk_start = '09:30',
+            wrk_end = '15:30',
+            day_end = '23:59',
+            hour = 9,
+            minute = 30,
             index='created_at',
-            file=f'/pivot_user_wkd_merge_by_five_min_wrkhrs.parquet',
+            file=f'/pivot_user_wkd_merge_by_five_minutes_wrkhrs.parquet',
+            folder=f'./data/transformed/twitter')
+# ***** BY MINUTE *****
+merge_hours(df=wkd_merge_by_minute.copy(),
+            day_start ='00:00',
+            wrk_start = '09:30',
+            wrk_end = '15:30',
+            day_end = '23:59',
+            hour = 9,
+            minute = 30,
+            index='created_at',
+            file=f'/pivot_user_wkd_merge_by_minute_wrkhrs.parquet',
             folder=f'./data/transformed/twitter')
 # %%

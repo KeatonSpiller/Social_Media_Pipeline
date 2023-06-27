@@ -1,5 +1,1 @@
-- Improve Bigram speed ( replace with nltk bigram function )
-
-- yahoo finance by minute or 5 minutes
-
-- Extract another social media platform
+- Improve Bigram speed ( replace with nltk bigram function | wort2vec | Facebook/bert vectorized probabilities)

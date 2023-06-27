@@ -1,7 +1,8 @@
 # pip freeze | findstr lxml
 pandas >= 2.0.1
 numpy >= 1.23.4
-advertools >= 0.13.2 # faster pandas
+advertools >= 0.13.2 # Faster pandas
+timedelta == 2020.12.3 # Subtracting and adding pandas datetime days
 
 argon2-cffi == 21.3.0 # Hashing Encryption
 

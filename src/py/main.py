@@ -148,16 +148,37 @@ def main():
                     import stock_prediction
                 case 'run_all':
                     print(f"Run All\n****************************************************************\n")
-                    print("Extract Twitter", end="\n")
-                    import extract_twitter
-                    print("Transform Twitter", end="\n")
-                    import transform_twitter
-                    print("Extract Stocks", end="\n")
-                    import extract_stocks
+                    
+                    try:
+                        print("Extract Twitter", end="\n")
+                        import extract_twitter
+                    except Exception as e:
+                        print("ERROR Extracting Twitter", end="\n")
+                        print(f'Exception: {e}',end ='\n')
+                        
+                    try:
+                        print("Transform Twitter", end="\n")
+                        import transform_twitter
+                    except Exception as e:
+                        print("ERROR Transforming Twitter", end="\n")
+                        print(f'Exception: {e}',end ='\n')
+                        
+                    try:   
+                        print("Extract Stocks", end="\n")
+                        import extract_stocks
+                    except Exception as e:
+                        print("ERROR Extracting Stocks", end="\n")
+                        print(f'Exception: {e}',end ='\n')
+                        
                     # print("load raw twitter to MYSQL", end="\n")
                     # import load_extract
-                    print("Stock Prediction", end="\n")
-                    import stock_prediction 
+                    
+                    try:
+                        print("Stock Prediction", end="\n")
+                        import stock_prediction 
+                    except Exception as e:
+                        print("ERROR Predicting Stocks", end="\n")
+                        print(f'Exception: {e}',end ='\n')
                 case _:
                     print("neither", end="\n") # unknown
 

@@ -2,6 +2,7 @@
 # Import Libraries
 import os,pandas as pd, sys, yfinance as yf
 from datetime import date, timedelta
+import pytz
 
 # %%            
 # - Change Directory to top level folder
@@ -46,15 +47,18 @@ print(f'{how_far_back} -> {today}')
 
 # Columns to rename
 column_rename_date  =(({'Date':'date'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
-column_rename_datetime  =(({'Datetime':'date'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
+column_rename_datetime  =(({'Datetime':'timestamp'}) | dict(zip(ticker_df.ticker_name, ticker_df.ticker_label)))
 columns_to_normalize = list(ticker_df.ticker_label)
 
-# ***** By DAY *****
+# %%
+# ***** HISTORICAL By DAY *****
+
 # Download Range of Stocks by day
 historical_stocks_byday_df = download_historical_stocks(stocks_to_download=stock_str,
                                                         columns_to_rename = column_rename_date,
                                                         how_far_back=how_far_back,
                                                         upto=today,
+                                                        index='date',
                                                         file='stock_tickers_byday',
                                                         folder=f'./data/extracted/merged/stocks',
                                                         period='1d',
@@ -64,12 +68,15 @@ normalize_historical_stocks(df=historical_stocks_byday_df.copy(),
                             columns= columns_to_normalize, 
                             file="stock_tickers_byday_norm",
                             folder=f'./data/transformed/stocks')
-# ***** BY HOUR *****
+
+# %%
+# ***** HISTORICAL BY HOUR *****
 # Download Range of Stocks by hour
 historical_stocks_byhour_df = download_historical_stocks(stocks_to_download=stock_str,
                                                         columns_to_rename = column_rename_datetime,
                                                         how_far_back=how_far_back,
                                                         upto=today,
+                                                        index = 'timestamp',
                                                         file='stock_tickers_byhour',
                                                         folder=f'./data/extracted/merged/stocks',
                                                         period='1d',
@@ -80,44 +87,39 @@ normalize_historical_stocks(df=historical_stocks_byhour_df.copy(),
                             file="stock_tickers_byhour_norm",
                             folder=f'./data/transformed/stocks')
 # %%
-# ***** BY HALF HOUR ***** UNABLE to DOWNLOAD for long periods
-# # Download Range of Stocks by half hour
-# historical_stocks_by_halfhour_df = download_historical_stocks(stocks_to_download=stock_str,
-#                                                         columns_to_rename = column_rename_datetime,
-#                                                         how_far_back=how_far_back,
-#                                                         upto=today,
-#                                                         file='stock_tickers_by_halfhour',
-#                                                         folder=f'./data/extracted/merged/stocks',
-#                                                         period='1d',
-#                                                         interval='30m')
-# # Min Max Normalize historical Stocks by hour ( smallest available interval to download )
-# normalize_historical_stocks(df=historical_stocks_by_halfhour_df.copy(),
-#                             columns= columns_to_normalize, 
-#                             file="stock_tickers_by_halfhour_norm",
-#                             folder=f'./data/transformed/stocks')
-
-# %%
-# ***** TODAY *****
-# Download Todays Stocks by minute
+# ***** TODAY BY MINUTE *****
 todays_stocks_byminute_df = download_todays_stocks(stocks_to_download=stock_str, 
-                                        columns_to_rename=column_rename_datetime, 
-                                        file="todays_stock_tickers",
+                                        columns_to_rename=column_rename_datetime,
+                                        index='timestamp',
+                                        file="stock_tickers_minute_today",
                                         folder=f'./data/extracted/merged/stocks',
                                         period='1d',
                                         interval='1m')
 # Min Max Normalize Todays Stocks 
-# from historical stocks ( by-day )
 normalize_todays_stocks(df_today=todays_stocks_byminute_df,
                         df_historical=historical_stocks_byday_df.copy(), 
                         columns= columns_to_normalize, 
-                        file="todays_stock_tickers_norm_byday",
+                        file="stock_tickers_norm_by_minute_today",
                         folder=f'./data/transformed/stocks')
+# %%
+# ***** TODAY BY HOUR *****
+yesterday = date.today() + timedelta(days=-1)
+tommorow = date.today() + timedelta(days=1)
+todays_stocks_byhour_df = download_historical_stocks(
+                                        stocks_to_download=stock_str, 
+                                        columns_to_rename=column_rename_datetime,
+                                        how_far_back=today,
+                                        upto=tommorow, # exclusive
+                                        index='timestamp',
+                                        file="stock_tickers_hour_today",
+                                        folder=f'./data/extracted/merged/stocks',
+                                        period='1d',
+                                        interval='60m')
 # Min Max Normalize Todays Stocks 
-# from historical stocks ( by-hour )
-normalize_todays_stocks(df_today=todays_stocks_byminute_df,
-                        df_historical=historical_stocks_byhour_df.copy(), 
+normalize_todays_stocks(df_today=todays_stocks_byhour_df,
+                        df_historical=historical_stocks_byday_df.copy(), 
                         columns= columns_to_normalize, 
-                        file="todays_stock_tickers_norm_byhour",
+                        file="stock_tickers_norm_by_hour_today",
                         folder=f'./data/transformed/stocks')
-# *******************************************************************************************************************************************************************************************************************************************************
+todays_stocks_byhour_df
 # %%

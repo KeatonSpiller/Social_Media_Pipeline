@@ -1,6 +1,6 @@
 import yfinance as yf, pandas as pd, os
 
-def download_historical_stocks(stocks_to_download, columns_to_rename, how_far_back, upto, file, folder, progress = False, period='1d', interval = '1d'):
+def download_historical_stocks(stocks_to_download, columns_to_rename, how_far_back, upto, index, file, folder, progress = False, period='1d', interval = '1d'):
     
     # Download closing prices for Stocks from date Range
     df = yf.download(stocks_to_download,
@@ -10,16 +10,16 @@ def download_historical_stocks(stocks_to_download, columns_to_rename, how_far_ba
                                 interval = interval,
                                 keepna=True,
                                 progress=progress)['Close'].reset_index().rename(columns=columns_to_rename).fillna(0)
-    # convert to pyarrow
-    df = df.set_index('date')
-    df = df.astype('float64[pyarrow]').reset_index().astype({'date':'datetime64[ns]'})
+    df = df.set_index(index).astype('float64[pyarrow]').reset_index()
+    df[index] = df[index].dt.tz_localize('America/New_York').dt.tz_convert('America/New_York')
     # export original
     df_to_parquet(df = df, 
-            folder = folder, 
-            file = f'/{file}.parquet')
+                folder = folder, 
+                file = f'/{file}.parquet')
     return df
 
 def normalize_historical_stocks(df, columns, file, folder):
+    
     # Min Max normalize tickers
     for c in columns:
         df[c] = (df[c] - df[c].min()) / (df[c].max() - df[c].min()) 
@@ -28,15 +28,16 @@ def normalize_historical_stocks(df, columns, file, folder):
             folder = folder, 
             file = f'/{file}.parquet')
     
-def download_todays_stocks(stocks_to_download, columns_to_rename, file, folder, period='1d', interval='1m'):
+def download_todays_stocks(stocks_to_download, columns_to_rename, index, file, folder, period='1d', interval='1m'):
+    
     df = yf.download(stocks_to_download, 
                                    period=period, 
                                    interval = interval,
                                    keepna=True, 
                                    progress=False)['Close'].reset_index().rename(columns=columns_to_rename).fillna(0)
     # convert to pyarrow
-    df = df.set_index('date')
-    df = df.astype('float64[pyarrow]').tz_convert('UTC').reset_index().astype({"date":"timestamp[us][pyarrow]"})
+    df = df.set_index(index).astype('float64[pyarrow]').reset_index()
+    df[index] = df[index].dt.tz_convert('America/New_York')
     # export original
     df_to_parquet(df = df, 
             folder = folder, 
