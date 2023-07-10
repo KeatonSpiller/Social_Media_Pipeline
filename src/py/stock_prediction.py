@@ -11,6 +11,9 @@ from sklearn.preprocessing import RobustScaler
 from datetime import date, timedelta
 from sklearn.feature_selection import SequentialFeatureSelector
 from sklearn.neighbors import KNeighborsClassifier
+# from mc_simulation import AverageModel as am
+# from mc_simulation import VolatilityModel as vm
+# from mc_simulation import MonteCarloSimulation as mcs
 
 # %%            
 # - Change Directory to top level folder
@@ -120,133 +123,147 @@ todays_merge_hour_df = pd.merge(todays_twitter_hour_df,todays_stocks_byhour_df, 
 df_to_parquet(df = todays_merge_hour_df, folder = f'./data/transformed/merged', file = f'/todays_twitter_stock_merge_byhour.parquet')
 todays_merge_hour_df
 
-# ********************************************************************
-# Test volatility of Market
-# predict price of stock and between -1 to 1 how good
-# predict for today | 1 week | 2 weeks ahead by HOUR
-# Build a pipeline of models simple to complex
-# moving averages ? (SMA, EMA, MACD), the Relative Strength Index (RSI), Bollinger Bands (BBANDS)
-
-# ********************************************************************
-
-# 1 WEEK ( Simulated )
-# **** BY HOUR ****
-
-# 2 WEEK ( Simulated )
-# **** BY HOUR ****
-
 # %%
 
-# LINEAR MODEL
-# **** TRAIN ****
+# **** LINEAR MODEL TRAIN BY [HOUR] ****
 # non time series
 label = 'APPLE'
 train_df = historical_merge_byhour_df.copy().set_index(index).astype('float32')
-
-# robust scaling ->
+# ************** scaling ******************
+# robust scaling -> removing median and upper/lower percentiles
 # (df[c] - df[c].median()) / (df[c].quantile(0.75) - df[c].quantile(0.25))
 scaler = RobustScaler()
 scaler.fit(train_df)
 train_df = pd.DataFrame(scaler.transform(train_df), index= train_df.index, columns = train_df.columns).astype('float32')
-
-# ************** Y ******************
+# ************** Y train ******************
 # normalized
 # y = train_df.loc[:,label]
 # non normalized
 y = stocks_byhour_non_norm.loc[stocks_byhour_non_norm.index.isin(train_df.index),label].astype('float32')
-
-# *********** X ***************
-# stocks and twitter
+# *********** X train ***************
+# twitter and stocks
 # drop y label
 X = train_df.drop( columns = [label] )
 # drop today from training to avoid over training
 X = X.loc[pd.to_datetime(train_df.index).date != today,:]
-
-# twitter w/out stocks
-# twitter_X = historical_twitter_byhour_df.set_index(index).copy()
-# X = twitter_X.loc[twitter_X.index.isin(train_df.index),:].drop(columns = ['favorite_count', 'retweet_count'] ).astype('float32')
-# X = train_df.loc[:,'bigram_CNN':'unigram_guardian']
-# X = twitter_X.loc[train_df.index.isin(twitter_X.index),:]
-
-# For Cross Validation to minimize bias/varaince
-# X_train, X_train_eval, y_train, y_train_eval = train_test_split(X, y, test_size=0.8, random_state=42)
-
-# statsmodels
+# twitter without stocks
+twitter_prob_column = X.columns[X.columns.str.contains(pat="bigram_|unigram_|trigram_")]
+X_twitter_only = X.loc[:,twitter_prob_column]
+#**** BUILD Linear Model training dataset for X and y ****
+# statsmodels lm
 sm_lm = sm.OLS(endog=y, exog=sm.add_constant(X)).fit() # X = exog Y  = endog
+# Statistics Summary
+# print(sm_lm.summary()) 
 # sklearn
 lm= LinearRegression(fit_intercept = True, copy_X = True).fit(X=X, y=y)
-# print(sm_lm.summary())
-
-# # sequential feature selector
-# sfs = SequentialFeatureSelector(lm, n_features_to_select=3)
+### *** Cross Validation *** ####
+# Cross Validation to minimize bias/varaince with sampling split for better trained model
+# X_train, X_train_eval, y_train, y_train_eval = train_test_split(X, y, test_size=0.8, random_state=42)
+# scores = cross_val_score(lm, X, y, cv=5)
+#**** # remove high p value variables ****
+# sfs = SequentialFeatureSelector(lm, n_features_to_select=5)
 # fit = sfs.fit(X, y)
 # trf = sfs.transform(X)
-# trf_column = list(sfs.get_feature_names_out())
-# trf_X = pd.DataFrame(trf, columns = trf_column, index=X.index)
+# trf_X = pd.DataFrame(trf, columns = list(sfs.get_feature_names_out()), index=X.index)
 # lm= LinearRegression(fit_intercept = True, copy_X = True).fit(X=trf_X, y=y)
-
-# predict
-train_predictions = lm.predict(X)
-# # scores = cross_val_score(lm, X, y, cv=5)
-
-# Visualize True vs predicted Values
+# **** Visualize Linear Model of TRAINING DATASET *****
+test_split = 0.25
+train_split = 1 - test_split
+X_train, X_train_eval, y_train, y_train_eval = train_test_split(X, y, test_size=test_split, random_state=42)
+lm_test= LinearRegression(fit_intercept = True, copy_X = True).fit(X=X_train, y=y_train)
+train_predictions = lm_test.predict(X_train_eval)
 fig, ax = plt.subplots()
-# plt.scatter(x = y_train_eval, 
-#             y = train_predictions)
-
-plt.plot(y.index, y, "ro", label="True Values")
-plt.plot(X.index, train_predictions, "bo", label="Predictions", )
+time_axis_train = pd.to_datetime(y_train_eval.index)
+plt.plot(time_axis_train, y_train_eval, "ro", label="True Values Training Data")
+plt.plot(time_axis_train, train_predictions, "bo", label="Predictions Training Data", )
+ax.set_title(label=f'Predictions From Training Data (split -> train: {int(train_split * 100)}% test: {int(test_split* 100)}%)')
 plt.xticks(rotation=90)
 plt.xlabel("Day")
 plt.ylabel(f"Price of {label}")
 ax.legend()
-# %%
 # ********** OUTLIERS ??? ************
-train_df[(train_df > 2).any(axis=1)]
+# train_df[(train_df > 2).any(axis=1)]
 # train_df[train_df.isin([np.nan, np.inf, -np.inf]).any(axis=1)]
- # %%
- 
-# # **** TEST ****
-todays_merge_hour_df_norm = todays_merge_hour_df.copy().set_index(index).astype('float32')
-# # to account for the many zero's forward fill
-# todays_merge_hour_df_norm = todays_merge_hour_df_norm.ffill()
-test_df = todays_merge_hour_df_norm.copy()
+# %%
 
-# ************** Y ******************
-# normalized y (% and porportions)
+# **** LINEAR MODEL TEST BY [HOUR]  ****
+# ************* TODAY FOR PRICE NOW *******************
+test_df = todays_merge_hour_df.copy().set_index(index).astype('float32')
+# ************** scaling ******************
+# robust scaling -> removing median and upper/lower percentiles
+# (df[c] - df[c].median()) / (df[c].quantile(0.75) - df[c].quantile(0.25))
+# scaler = RobustScaler()
+# scaler.fit(test_df)
+# test_df = pd.DataFrame(scaler.transform(test_df), index= test_df.index, columns = test_df.columns).astype('float32')
+# ************** Y TEST ******************
+# normalized y
 # y_test = test_df.loc[:,label]
 # non normalized y
 y_test = todays_stocks_byhour_non_norm.loc[todays_stocks_byhour_non_norm.index.isin(test_df.index),label].astype('float32')
-# *********** X ***************
+# *********** X TEST ***************
 # stocks and twitter
 X_test = test_df.loc[:,~(test_df.columns==label)]
-# using X values removed from p value significance
-# X_test = X_test.loc[:,trf_X.columns]
-# twitter w/out stocks
-# # For Cross Validation to minimize bias/varaince
-# X_test, X_test_eval, y_test, y_test_eval = train_test_split(X_test, y_test, test_size=0.8, random_state=42)
-
-# statsmodels
-sm_lm = sm.OLS(endog=y_test, exog=sm.add_constant(X_test)).fit() # X = exog Y  = endog
+#**** BUILD Linear Model test dataset****
+# statsmodel
+sm_lm_test = sm.OLS(endog=y_test, exog=sm.add_constant(X_test)).fit() # X = exog Y  = endog
+print(sm_lm_test.summary())
 # sklearn
 test_predictions = lm.predict(X_test)
-# print(sm_lm.summary())
-
+# plot
 fig, ax = plt.subplots()
-# ax.scatter(x = y_test, y = test_predictions)
-time_axis = pd.to_datetime(y_test.index).strftime('%I:%M\n %d/%m\n %Y\n')
-
-print(time_axis)
-
-plt.plot(time_a, "-r", label="True Values")
+time_axis = pd.to_datetime(y_test.index).strftime('%I:%M\n %m/%d\n %Y\n')
+plt.plot(time_axis, y_test, "-r", label="True Values")
 plt.plot(time_axis, test_predictions, "-b", label="Predictions", )
-# plt.xticks(rotation=90)
-
 plt.xlabel("Hours 9:30AM to 3:30PM EST")
 plt.ylabel(f"Price of {label}")
 ax.legend()
 
 # %%
+# 1 WEEK ( Simulated ) to next Friday
+# **** LINEAR MODEL TEST BY [HOUR]  ****
+# **** (1 Week Simulated) ****
+sample_from = X_test.copy()
+
+# Generate Next Week's timestamps by hour,workday,workweek in (EST Military)
+start_range = pd.to_datetime(sample_from.index.max())
+start_range_normalized = start_range.normalize()
+weekday = start_range_normalized.weekday() # Monday is 0 and Sunday is 6
+end_range_normalized = start_range_normalized.replace(day = int(start_range_normalized.day) + 8, hour=23, minute=59)
+start_workday = "09:30"
+end_workday = "15:30"
+week_range_all = pd.bdate_range(start=start_range_normalized, end=end_range_normalized, freq='H',tz='America/New_York')
+week_range_all = week_range_all.drop(week_range_all.max())
+week_range_offset = week_range_all + pd.tseries.offsets.DateOffset(minutes = 30)
+week_range_mask = week_range_offset.indexer_between_time(start_workday, end_workday)
+week_range = week_range_offset[week_range_mask]
+
+historical_mean = X.mean()
+historical_std = X.std()
+
+# Simulate Samples from the last prices against randomized variations of the std and mean
+sample_count = len(sample_from)
+choice = [1,-1]
+simulated_results = pd.DataFrame()
+# for h in week_range[0:10]:
+#     random_sample_from_today = sample_from.iloc[np.random.randint(sample_count)]
+#     random_norm = np.random.normal()
+#     sub_or_add = np.random.choice(choice)
+#     sample = random_sample_from_today + (sub_or_add * (random_norm + (historical_std)))
+#     pd.DataFrame([sample[:]], columns = sample.index, index= h)
+    # sub_df = pd.DataFrame(sample, columns=sample_from.columns)
+    # sub_df['timestamp'] = h
+    # sub_df.set_index(index)
+    # print(sub_df)
+    # simulated_results = pd.concat([simulated_results, sub_df])
+    # print(simulated_results)
+
+
+
+# 2 WEEK ( Simulated )
+# **** BY HOUR ****
+
+# %% Previous Implementation 
+# FOR EVERY STOCK prediction BETWEEN (-1 BAD to 1 GOOD)
 # Build Target and predict
 # Xnew = sm.add_constant(todays_merge_df.set_index('date'), has_constant='add')
 # model = {} # Model Build For Each index fund
