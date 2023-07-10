@@ -35,9 +35,20 @@ with open(os.path.normpath(os.getcwd() + './user_input/stock_tickers.xlsx'), 'rb
 stock_str = " ".join(ticker_df.ticker_name)
 
 # %%
+# TODAY
+today = date.today()
+
+# IF Weekend Set today to Last friday to align with stock market
+dayofweek = today.weekday() # Range (0 : mon -> 6 : Sun)
+if(dayofweek  == 5):
+    today = today.replace(day = today.day - 1)
+if(dayofweek == 6):
+    today = today.replace(day = today.day - 2)
+    
+# %%
+
 # Cross reference Twitter for how far back to download
 file = './data/transformed/twitter/pivot_user_wkd_merge_byday.parquet'
-today = date.today()
 if os.path.exists(file):
     df = pd.read_parquet(file, engine= 'pyarrow', dtype_backend = 'pyarrow')
     how_far_back = df.date.min().date()
@@ -103,6 +114,7 @@ normalize_todays_stocks(df_today=todays_stocks_byminute_df,
                         folder=f'./data/transformed/stocks')
 # %%
 # ***** TODAY BY HOUR *****
+
 yesterday = date.today() + timedelta(days=-1)
 tommorow = date.today() + timedelta(days=1)
 todays_stocks_byhour_df = download_historical_stocks(

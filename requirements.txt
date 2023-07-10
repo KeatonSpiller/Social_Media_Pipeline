@@ -34,6 +34,7 @@ textherox >= 1.2.0 # uses gensim
 # analysis
 statsmodels == 0.14.0
 seaborn == 0.12.2
+sklearn==0.0 # modeling and analysis tools
 
 # tqdm == 4.65.0 # required for easyNMT
 # torch == 2.0.1 # required for easyNMT

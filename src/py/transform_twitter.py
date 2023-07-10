@@ -412,8 +412,10 @@ def merge_hours(df, day_start, day_end, wrk_start, wrk_end, hour, minute, index,
     wrk_hrs_merge = pd.concat([wrk_hours, before_wrk]).groupby(index).sum()
 
     # Merge after work hours with next day opening hour
+    # e.g., ([2023-02-27 09:30 values now shift to 2023-02-28 09:30] and sum with original opening hours values on [2023-02-28 09:30])
     after_wrk[index] = after_wrk[index].apply(lambda x:x.replace(hour=hour,minute=minute))
-    after_wrk_shifted= after_wrk.set_index(index).shift(freq='D', periods=-1)
+    after_wrk_shifted= after_wrk.set_index(index).shift(freq='D', periods=1)
+    
     wrk_hrs_merge = pd.concat([wrk_hrs_merge, after_wrk_shifted])
     wrk_hrs_merge = wrk_hrs_merge.groupby(index).sum().reset_index()
 

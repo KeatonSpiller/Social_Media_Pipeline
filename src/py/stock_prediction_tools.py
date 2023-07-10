@@ -80,8 +80,8 @@ def create_target(df, day = 5, ticker= "SandP_500"):
 
     try:
         df.insert(loc = 0,
-                        column = 'y',
-                        value = np.where(conditional, 1, 0) )
+                  column = 'y',
+                  value = np.where(conditional, 1, 0) )
     except ValueError:
         print(ticker)
         pass
