@@ -169,10 +169,8 @@ def main():
                     except Exception as e:
                         print("ERROR Extracting Stocks", end="\n")
                         print(f'Exception: {e}',end ='\n')
-                        
                     # print("load raw twitter to MYSQL", end="\n")
                     # import load_extract
-                    
                     try:
                         print("Stock Prediction", end="\n")
                         import stock_prediction 

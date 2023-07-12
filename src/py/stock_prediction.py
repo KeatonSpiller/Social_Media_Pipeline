@@ -14,6 +14,8 @@ from sklearn.neighbors import KNeighborsClassifier
 # from mc_simulation import AverageModel as am
 # from mc_simulation import VolatilityModel as vm
 # from mc_simulation import MonteCarloSimulation as mcs
+from prophet import Prophet
+from prophet.plot import plot_plotly, plot_components_plotly
 
 # %%            
 # - Change Directory to top level folder
@@ -131,10 +133,23 @@ label = 'APPLE'
 train_df = historical_merge_byhour_df.copy().set_index(index).astype('float32')
 # ************** scaling ******************
 # robust scaling -> removing median and upper/lower percentiles
-# (df[c] - df[c].median()) / (df[c].quantile(0.75) - df[c].quantile(0.25))
-scaler = RobustScaler()
-scaler.fit(train_df)
-train_df = pd.DataFrame(scaler.transform(train_df), index= train_df.index, columns = train_df.columns).astype('float32')
+def robust_scaling(df, upper_bound= 0.75, lower_bound = 0.25, apply_metrics= None):
+    rescale_metrics = {}
+    if(apply_metrics==None):
+        for c in df.columns:
+            df[c] = (df[c] - df[c].median()) / (df[c].quantile(upper_bound) - df[c].quantile(lower_bound))
+            rescale_metrics[c] = {'median':df[c].median(),
+                                'upper_bound':df[c].quantile(upper_bound),
+                                'lower_bound':df[c].quantile(lower_bound)}
+        return df, rescale_metrics
+    else: # scale by some other median & upperbound/lowerbound set
+        for c in df.columns:
+            df[c] = (df[c] - apply_metrics[c]['median']) / (apply_metrics[c]['upper_bound'] - apply_metrics[c]['lower_bound'])
+        return df
+# scaler = RobustScaler()
+# scaler.fit(train_df)
+# train_df = pd.DataFrame(scaler.transform(train_df), index= train_df.index, columns = train_df.columns).astype('float32')
+train_df, rescale_metrics = robust_scaling(train_df.copy(), upper_bound= 0.95, lower_bound=0.05)
 # ************** Y train ******************
 # normalized
 # y = train_df.loc[:,label]
@@ -173,9 +188,13 @@ X_train, X_train_eval, y_train, y_train_eval = train_test_split(X, y, test_size=
 lm_test= LinearRegression(fit_intercept = True, copy_X = True).fit(X=X_train, y=y_train)
 train_predictions = lm_test.predict(X_train_eval)
 fig, ax = plt.subplots()
+# Y = B_0 * X_0 + ... B_m * X_m + intercept |...|...| # Y = B_0 * X_0 + e + .. B_m * X_m + e + intercept + e
+# intercept = lm_test.intercept_
+# B = lm_test.coef_
+# trend = (B*X_train_eval + intercept )
 time_axis_train = pd.to_datetime(y_train_eval.index)
 plt.plot(time_axis_train, y_train_eval, "ro", label="True Values Training Data")
-plt.plot(time_axis_train, train_predictions, "bo", label="Predictions Training Data", )
+plt.plot(time_axis_train, train_predictions, "bo", label="Predictions Training Data" )
 ax.set_title(label=f'Predictions From Training Data (split -> train: {int(train_split * 100)}% test: {int(test_split* 100)}%)')
 plt.xticks(rotation=90)
 plt.xlabel("Day")
@@ -191,10 +210,8 @@ ax.legend()
 test_df = todays_merge_hour_df.copy().set_index(index).astype('float32')
 # ************** scaling ******************
 # robust scaling -> removing median and upper/lower percentiles
-# (df[c] - df[c].median()) / (df[c].quantile(0.75) - df[c].quantile(0.25))
-# scaler = RobustScaler()
-# scaler.fit(test_df)
-# test_df = pd.DataFrame(scaler.transform(test_df), index= test_df.index, columns = test_df.columns).astype('float32')
+# Needs to Scale by the variables in the Historical DataSet
+test_df = robust_scaling(test_df.copy(), upper_bound= 0.95, lower_bound=0.05, apply_metrics = rescale_metrics)
 # ************** Y TEST ******************
 # normalized y
 # y_test = test_df.loc[:,label]
@@ -206,14 +223,15 @@ X_test = test_df.loc[:,~(test_df.columns==label)]
 #**** BUILD Linear Model test dataset****
 # statsmodel
 sm_lm_test = sm.OLS(endog=y_test, exog=sm.add_constant(X_test)).fit() # X = exog Y  = endog
-print(sm_lm_test.summary())
+# print(sm_lm_test.summary())
 # sklearn
 test_predictions = lm.predict(X_test)
 # plot
 fig, ax = plt.subplots()
 time_axis = pd.to_datetime(y_test.index).strftime('%I:%M\n %m/%d\n %Y\n')
 plt.plot(time_axis, y_test, "-r", label="True Values")
-plt.plot(time_axis, test_predictions, "-b", label="Predictions", )
+plt.plot(time_axis, test_predictions, "-b", label="Predictions")
+ax.set_title(label=f'Predictions For {label} By Hour Today')
 plt.xlabel("Hours 9:30AM to 3:30PM EST")
 plt.ylabel(f"Price of {label}")
 ax.legend()
@@ -224,40 +242,102 @@ ax.legend()
 # **** (1 Week Simulated) ****
 sample_from = X_test.copy()
 
-# Generate Next Week's timestamps by hour,workday,workweek in (EST Military)
-start_range = pd.to_datetime(sample_from.index.max())
-start_range_normalized = start_range.normalize()
-weekday = start_range_normalized.weekday() # Monday is 0 and Sunday is 6
-end_range_normalized = start_range_normalized.replace(day = int(start_range_normalized.day) + 8, hour=23, minute=59)
-start_workday = "09:30"
-end_workday = "15:30"
-week_range_all = pd.bdate_range(start=start_range_normalized, end=end_range_normalized, freq='H',tz='America/New_York')
-week_range_all = week_range_all.drop(week_range_all.max())
-week_range_offset = week_range_all + pd.tseries.offsets.DateOffset(minutes = 30)
-week_range_mask = week_range_offset.indexer_between_time(start_workday, end_workday)
-week_range = week_range_offset[week_range_mask]
+def ts_workdays_workhours_perhour_offset_Range(df, start_workday = "09:30", end_workday = "15:30", byincrement = 'H', howmanydays=7, offset = 30, tz='America/New_York'):
+     
+    # Generate Next Week's timestamps by hour,workday,workweek in (EST Military)
+    start_range = pd.to_datetime(df.index.max())
+    start_range_normalized = start_range.normalize()
+    weekday = start_range_normalized.weekday() # Monday is 0 and Sunday is 6
+    howmanydays = howmanydays + 1 # exclusive, remove the ending 24:00 time
+    end_range_normalized = start_range_normalized.replace(day = int(start_range_normalized.day) + howmanydays, hour=23, minute=59)
+    week_range_all = pd.bdate_range(start=start_range_normalized, end=end_range_normalized, freq=byincrement,tz=tz)
+    week_range_all = week_range_all.drop(week_range_all.max())
+    week_range_offset = week_range_all + pd.tseries.offsets.DateOffset(minutes = offset)
+    week_range_mask = week_range_offset.indexer_between_time(start_workday, end_workday)
+    week_range = week_range_offset[week_range_mask]
+    return week_range
+
+week_range = ts_workdays_workhours_perhour_offset_Range(sample_from, 
+                                                        start_workday = "09:30", 
+                                                        end_workday = "15:30", 
+                                                        byincrement = 'H', 
+                                                        howmanydays=7, 
+                                                        offset = 30, 
+                                                        tz='America/New_York')
 
 historical_mean = X.mean()
 historical_std = X.std()
-
 # Simulate Samples from the last prices against randomized variations of the std and mean
-sample_count = len(sample_from)
-choice = [1,-1]
-simulated_results = pd.DataFrame()
-# for h in week_range[0:10]:
-#     random_sample_from_today = sample_from.iloc[np.random.randint(sample_count)]
-#     random_norm = np.random.normal()
-#     sub_or_add = np.random.choice(choice)
-#     sample = random_sample_from_today + (sub_or_add * (random_norm + (historical_std)))
-#     pd.DataFrame([sample[:]], columns = sample.index, index= h)
-    # sub_df = pd.DataFrame(sample, columns=sample_from.columns)
-    # sub_df['timestamp'] = h
-    # sub_df.set_index(index)
-    # print(sub_df)
-    # simulated_results = pd.concat([simulated_results, sub_df])
-    # print(simulated_results)
+# %%
+top_end = sample_from + historical_std
+bottom_end = sample_from - historical_std
 
+bestcase_future_test_predictions = lm.predict(top_end)
+worstcase_future_test_predictions = lm.predict(bottom_end)
+# test best case worst case of today
+fig, ax = plt.subplots()
+time_axis = pd.to_datetime(sample_from.index).strftime('%I:%M\n %m/%d\n %Y\n')
+plt.plot(time_axis, y_test, "bo", label="Actual")
+plt.plot(time_axis, bestcase_future_test_predictions, "go", label="Best Case")
+plt.plot(time_axis, worstcase_future_test_predictions, "ro", label="Worst Case")
+ax.set_title(label=f'Historical Deviation For {label} By Hour Today')
+plt.xlabel("Hours 9:30AM to 3:30PM EST")
+plt.ylabel(f"Price of {label}")
+ax.legend()
+last_hour = sample_from.iloc[-1]
 
+def std_shift(last_hour, std, timeline):
+    simulated = pd.DataFrame()
+    for h in timeline:
+        # 0 to 100% of standard deviation
+        shift = np.random.normal(0, 1)
+        # add or subtract the std
+        direction = np.random.choice([-1,1])
+        result = last_hour + (direction * shift * std)
+        row = pd.DataFrame(np.expand_dims(result, axis=0), columns = last_hour.index)
+        row['timestamp'] = h
+        row = row.set_index('timestamp')
+        simulated = pd.concat([row,simulated])
+        last_hour = simulated.iloc[-1]
+    
+    return simulated
+
+def simulate_predictions(lm, epochs, last_hour, std, timeline):
+    simulations = []
+    for s in range(epochs):
+        deviate = std_shift(last_hour, historical_std, timeline)
+        simulation = lm.predict(deviate)
+        simulations.append(simulation)
+    return simulations
+        
+simulations = simulate_predictions(lm, epochs = 100_000, last_hour=last_hour, std=historical_std, timeline=week_range)
+# %%
+# plot
+fig, ax = plt.subplots()
+# time_axis = pd.to_datetime(simulated.index).strftime('%m/%d\n')
+time_axis = pd.to_datetime(week_range)
+# plt.plot(time_axis, y_test, "-r", label="True Values")
+for prediction in simulations:
+    plt.plot(time_axis, prediction, "-", label="Predictions")
+ax.set_title(label=f'Simulated Predictions For {label} By Hour Next 7 days')
+plt.xlabel("Hours 9:30AM to 3:30PM EST")
+plt.ylabel(f"Price of {label}")
+plt.xticks(rotation=90)
+plt.plot()
+
+# %%
+avg_simulations = np.mean(simulations)
+std_simulations = np.std(simulations)
+print(avg_simulations, std_simulations)
+
+average_simulation = np.array(simulations).mean(axis=0)
+plt.plot(week_range, average_simulation, "-", label="Predictions")
+ax.set_title(label=f'Simulated Predictions For {label} By Hour Next 7 days')
+plt.xlabel("Hours 9:30AM to 3:30PM EST")
+plt.ylabel(f"Price of {label}")
+plt.xticks(rotation=90)
+plt.plot()
+print(pd.DataFrame(average_simulation, columns=[f'avg_simulation_{label}'], index = week_range))
 
 # 2 WEEK ( Simulated )
 # **** BY HOUR ****
@@ -275,4 +355,17 @@ simulated_results = pd.DataFrame()
 #     y_pred = m['lm'].predict(Xnew)
 #     model[t] = (y_pred, m)
 # print(model)
+# %%
+
+## Facebook Prophet
+# add today with history
+# df_all = df_train.merge(df_test)
+# m = Prophet(interval_width=0.95)
+# m.fit(df_train)
+# future = m.make_future_dataframe(periods=365)
+# forecast = m.predict(future)
+# forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+# fig1 = m.plot(forecast)
+# fig2 = m.plot_components(forecast)
+
 # %%
