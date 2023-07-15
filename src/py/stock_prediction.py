@@ -14,8 +14,8 @@ from sklearn.neighbors import KNeighborsClassifier
 # from mc_simulation import AverageModel as am
 # from mc_simulation import VolatilityModel as vm
 # from mc_simulation import MonteCarloSimulation as mcs
-from prophet import Prophet
-from prophet.plot import plot_plotly, plot_components_plotly
+# from prophet import Prophet
+# from prophet.plot import plot_plotly, plot_components_plotly
 
 # %%            
 # - Change Directory to top level folder
@@ -240,8 +240,10 @@ ax.legend()
 # 1 WEEK ( Simulated ) to next Friday
 # **** LINEAR MODEL TEST BY [HOUR]  ****
 # **** (1 Week Simulated) ****
-sample_from = X_test.copy()
-
+# sample_from = X_train.copy()
+sample_from = X_train[pd.to_datetime(X_train.index).date == pd.to_datetime(X_train.copy().index).date.max()]
+sample_from
+# %%
 def ts_workdays_workhours_perhour_offset_Range(df, start_workday = "09:30", end_workday = "15:30", byincrement = 'H', howmanydays=7, offset = 30, tz='America/New_York'):
      
     # Generate Next Week's timestamps by hour,workday,workweek in (EST Military)
@@ -274,18 +276,20 @@ bottom_end = sample_from - historical_std
 
 bestcase_future_test_predictions = lm.predict(top_end)
 worstcase_future_test_predictions = lm.predict(bottom_end)
-# test best case worst case of today
-fig, ax = plt.subplots()
-time_axis = pd.to_datetime(sample_from.index).strftime('%I:%M\n %m/%d\n %Y\n')
-plt.plot(time_axis, y_test, "bo", label="Actual")
-plt.plot(time_axis, bestcase_future_test_predictions, "go", label="Best Case")
-plt.plot(time_axis, worstcase_future_test_predictions, "ro", label="Worst Case")
-ax.set_title(label=f'Historical Deviation For {label} By Hour Today')
-plt.xlabel("Hours 9:30AM to 3:30PM EST")
-plt.ylabel(f"Price of {label}")
-ax.legend()
-last_hour = sample_from.iloc[-1]
 
+# %%
+# test best case worst case of today
+time_axis = pd.to_datetime(sample_from.index).strftime('%I:%M\n %m/%d\n %Y\n')
+# fig, ax = plt.subplots()
+# plt.plot(time_axis, y_test, "bo", label="Actual")
+# plt.plot(time_axis, bestcase_future_test_predictions, "go", label="Best Case")
+# plt.plot(time_axis, worstcase_future_test_predictions, "ro", label="Worst Case")
+# ax.set_title(label=f'Historical Deviation For {label} By Hour Today')
+# plt.xlabel("Hours 9:30AM to 3:30PM EST")
+# plt.ylabel(f"Price of {label}")
+# ax.legend()
+last_hour = sample_from.sort_index().iloc[-1]
+# %%
 def std_shift(last_hour, std, timeline):
     simulated = pd.DataFrame()
     for h in timeline:
@@ -309,8 +313,7 @@ def simulate_predictions(lm, epochs, last_hour, std, timeline):
         simulation = lm.predict(deviate)
         simulations.append(simulation)
     return simulations
-        
-simulations = simulate_predictions(lm, epochs = 100_000, last_hour=last_hour, std=historical_std, timeline=week_range)
+simulations = simulate_predictions(lm, epochs = 10, last_hour=last_hour, std=historical_std, timeline=week_range)
 # %%
 # plot
 fig, ax = plt.subplots()
@@ -339,9 +342,62 @@ plt.xticks(rotation=90)
 plt.plot()
 print(pd.DataFrame(average_simulation, columns=[f'avg_simulation_{label}'], index = week_range))
 
-# 2 WEEK ( Simulated )
+# %%
+# 1 Month ( Simulated )
 # **** BY HOUR ****
 
+def ts_workdays_workhours_perhour_offset_Range_month(df, start_workday = "09:30", end_workday = "15:30", byincrement = 'H', month=1, offset = 30, tz='America/New_York'):
+     
+    # Generate Next Week's timestamps by hour,workday,workweek in (EST Military)
+    start_range = pd.to_datetime(df.index.max())
+    start_range_normalized = start_range.normalize()
+    weekday = start_range_normalized.weekday() # Monday is 0 and Sunday is 6
+    end_range_normalized = start_range_normalized.replace(month = (start_range_normalized.month + month), hour=23, minute=59)
+    week_range_all = pd.bdate_range(start=start_range_normalized, end=end_range_normalized, freq=byincrement,tz=tz)
+    week_range_all = week_range_all.drop(week_range_all.max())
+    week_range_offset = week_range_all + pd.tseries.offsets.DateOffset(minutes = offset)
+    week_range_mask = week_range_offset.indexer_between_time(start_workday, end_workday)
+    week_range = week_range_offset[week_range_mask]
+    return week_range
+
+one_month = ts_workdays_workhours_perhour_offset_Range_month(sample_from, 
+                                                        start_workday = "09:30", 
+                                                        end_workday = "15:30", 
+                                                        byincrement = 'H', 
+                                                        month=1, 
+                                                        offset = 30, 
+                                                        tz='America/New_York')
+
+simulations = simulate_predictions(lm, epochs = 1000, last_hour=last_hour, std=historical_std, timeline=one_month)
+
+# %%
+# plot
+fig, ax = plt.subplots()
+# time_axis = pd.to_datetime(simulated.index).strftime('%m/%d\n')
+time_axis = pd.to_datetime(one_month)
+# plt.plot(time_axis, y_test, "-r", label="True Values")
+for prediction in simulations:
+    plt.plot(time_axis, prediction, "-", label="Predictions")
+ax.set_title(label=f'Simulated Predictions For {label} By Hour Next Month')
+plt.xlabel("Hours 9:30AM to 3:30PM EST")
+plt.ylabel(f"Price of {label}")
+plt.xticks(rotation=90)
+plt.plot()
+
+# %%
+avg_simulations = np.mean(simulations)
+std_simulations = np.std(simulations)
+print(avg_simulations, std_simulations)
+
+average_simulation = np.array(simulations).mean(axis=0)
+plt.plot(one_month, average_simulation, "o", label="Predictions")
+ax.set_title(label=f'Simulated Predictions For {label} By Hour Next Month')
+plt.xlabel("Hours 9:30AM to 3:30PM EST")
+plt.ylabel(f"Price of {label}")
+plt.xticks(rotation=90)
+plt.plot()
+avg_simulated_predictions = pd.DataFrame(average_simulation, columns=[f'avg_simulated_{label}_price'], index = one_month)
+avg_simulated_predictions.to_csv(f'./images/avg_simulated_predictions.csv')
 # %% Previous Implementation 
 # FOR EVERY STOCK prediction BETWEEN (-1 BAD to 1 GOOD)
 # Build Target and predict
