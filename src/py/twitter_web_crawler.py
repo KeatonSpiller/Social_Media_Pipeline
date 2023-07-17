@@ -61,18 +61,30 @@ options = webdriver.ChromeOptions()
 options.add_argument('--no-sandbox')
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument('--ignore-certificate-errors')
-# options.add_argument('--disable-gpu')
-options.add_argument('--log-level=3')
+# options.add_argument('--disable-extensions')
+options.add_extension(f'./drivers/NoBufferCRX0.4.4.crx') # Stop video's from auto playing
+options.add_argument('--blink-settings=imagesEnabled=false')
+options.add_argument('--disable-gpu')
+# options.add_argument('--log-level=3')
 options.add_argument('--disable-notifications')
 options.add_argument('--disable-popup-blocking')
+# remove password saving
+prefs = {"credentials_enable_service": False,
+     "profile.password_manager_enabled": False}
+options.add_experimental_option("prefs", prefs)
+# fix "Failed to load resource" (status 403/401)
+# options.add_argument('--disable-blink-features=AutomationControlled')
+options.add_experimental_option('useAutomationExtension', False)
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
 browser = webdriver.Chrome(executable_path=ChromeDriverManager(path = r"./drivers").install(),
-                            options=options)
+                            options=options,
+                            keep_alive=False)
 agent = browser.execute_script("return navigator.userAgent")
-width,height = 784,880
-browser.set_window_position(784, 0)
-browser.set_window_size(width=width, height=height)
+browser.set_window_size(width=782, height=871) #{'width': 782, 'height': 871}
+browser.set_window_position(x=761, y=0) #{'x': 761, 'y': 0}
 browser.get(LOGIN_URL)
-window_size = browser.get_window_size()
+window_size, window_position = browser.get_window_size(), browser.get_window_position()
 
 # %%
 print("Logging Into Twitter")
@@ -107,72 +119,70 @@ print("Begin User Page Scape")
 # for group in user_df:
 #     for user in user_df[group]:
 #         print(user)
-user = user_df.iloc[0][0]
+user = user_df.iloc[0][1]
 print(f'user:{user}\n')
 browser.get(f'https://www.twitter.com/{user}')
+user_name = WebDriverWait(browser, 20).until(EC.visibility_of_element_located((By.XPATH, '//div[@data-testid="UserName"]'))).get_attribute("innerText")
 
 # %%
-# print('Screenshot Test:')
-# Screenshot.full_screenshot(driver = browser, save_path='./images/screenshots', image_name='screenshot.png',load_wait_time=1)
-# Screenshot.get_element()
-
-# %%
-time.sleep(1)
-SCROLL_PAUSE_TIME,posts = 4,[]
-browser.execute_script(f"window.scrollTo(0, 0)")
+# 3 variations (scrollBy, scrolTo, scroll)
+# print(f'{user_name}\n Extracting')
 # browser.delete_all_cookies()
-# 3 variations [scrollBy (x-coord, y-coord), scrolTo (x-coord, y-coord), scroll (x-coord, y-coord)]
-while True:
+browser.execute_script(f"window.scrollTo(0, 0)") 
+SCROLL_PAUSE_TIME,posts,continue_scrolling,repetitive_scroll = 4,[],True,0
+metric_var = ['likes', 'views', 'Retweets', 'replies', 'like', 'view', 'Retweet', 'reply']
+metric_conditional = ''
+for i in range(0, len(metric_var)):
+    for j in range(i+1, len(metric_var)-1):
+        if ( i != j):
+            var1= metric_var[i]
+            var2=metric_var[j]
+            metric_conditional += f"(contains(@aria-label, '{var1}') and contains(@aria-label, '{var2}')) or "
+while(continue_scrolling==True or repetitive_scroll <= 2):
     last_position = browser.execute_script(f"return window.scrollY")
     try:
-        page_text = browser.find_elements(By.XPATH, '//div[@data-testid="tweetText"]')
-        page_metrics = browser.find_elements(By.XPATH, "//*[(contains(@aria-label, 'likes') and contains(@aria-label, 'views')) or (contains(@aria-label, 'likes') and contains(@aria-label, 'Retweets')) or (contains(@aria-label, 'views') and contains(@aria-label, 'Retweets'))]")
-        timestamps = browser.find_elements(By.XPATH, "//time")
+        repetitive_scroll = 0
+        # How much to sleep to avoid breaking the program
+        time.sleep(0.25)
+        page_text = WebDriverWait(browser, 2).until(EC.presence_of_all_elements_located((By.XPATH, '//div[@data-testid="tweetText"]')))
+        conditional_metric_string = "[metric_conditional]"
+        page_metrics = WebDriverWait(browser, 2).until(EC.presence_of_all_elements_located((By.XPATH, "//*[(contains(@aria-label, 'likes') and contains(@aria-label, 'views')) or (contains(@aria-label, 'likes') and contains(@aria-label, 'Retweets')) or (contains(@aria-label, 'views') and contains(@aria-label, 'Retweets')) or (contains(@aria-label, 'views') and contains(@aria-label, 'reply')) or (contains(@aria-label, 'views') and contains(@aria-label, 'reply'))]")))
+        timestamps = WebDriverWait(browser, 2).until(EC.presence_of_all_elements_located((By.XPATH, "//time")))
         replies,likes,views,retweets = 0,0,0,0
         for txt,metrics,ts in zip(page_text,page_metrics,timestamps):
-                created_at = pd.to_datetime(ts.get_attribute('datetime'))
-                text = txt.get_attribute('innerText').encode(encoding='utf-8').decode(encoding='utf-8')
-                metric = metrics.get_attribute('aria-label')
-                metric_num = re.findall('[\d]+', metric)
-                metric_string = re.findall('[a-zA-Z]+', metric)
-                for s,num in zip(metric_string, metric_num):
-                    if(s == 'reply' or s =='replies'):
-                        replies= num
-                    if(s == 'Retweets' or s =='Retweet'):
-                        retweets = num
-                    if(s == 'likes' or s =='likes'):
-                        likes = num
-                    if(s == 'views' or s =='view'):
-                        views = num
-                post = [created_at, text, metric, replies, retweets, likes, views]
-                if(post not in posts):
-                    posts.append(post)
-                browser.execute_script(f"window.scrollBy(0, 300)")
+            created_at = pd.to_datetime(ts.get_attribute('datetime'))
+            text = txt.get_attribute('innerText').encode(encoding='utf-8').decode(encoding='utf-8')
+            metric = metrics.get_attribute('aria-label')
+            metric_num = re.findall('[\d]+', metric)
+            metric_string = re.findall('[a-zA-Z]+', metric)
+            for s,num in zip(metric_string, metric_num):
+                if(s == 'reply' or s =='replies'):
+                    replies= num
+                if(s == 'Retweets' or s =='Retweet'):
+                    retweets = num
+                if(s == 'likes' or s =='likes'):
+                    likes = num
+                if(s == 'views' or s =='view'):
+                    views = num
+            post = [created_at, text, metric, replies, retweets, likes, views]
+            if(post not in posts):
+                posts.append(post)
+            if(browser.execute_script(f"return window.scrollY") == browser.execute_script(f"return document.body.scrollHeight")):
+                time.sleep(4)
+            browser.execute_script(f"window.scrollBy(0, 500)")
     except Exception as e:
-        browser.execute_script(f"window.scrollBy(0, 400)")
-        continue
+        time.sleep(0.25)
+        browser.execute_script(f"window.scrollBy(0, 500)")
+        repetitive_scroll +=1
+        pass
     position = browser.execute_script(f"return window.scrollY")
-    if( position == last_position):
+    if( position == last_position ):
+        print(position, last_position)
+        continue_scrolling=False
         break
+        # browser.quit()
+ 
 df = pd.DataFrame(data = posts, columns = ['created_at','text', 'metrics', 'replies', 'retweets', 'likes', 'views'])
+df = df.drop_duplicates(subset=['created_at','text'], keep='last').sort_values('created_at', ascending=False).reset_index(drop=True)
 df
-# print(texts, posts, metric, height, sep='\n')
-# %%
-# SCROLL_PAUSE_TIME,texts = 4,[]
-# browser.execute_script(f"window.scrollTo(0, 0)")
-# while True:
-#     browser.execute_script("window.scrollBy(0,400)", "")
-# last_height = browser.execute_script("window.scrollTo(0, document.body.scrollHeight)")
-# while True:
-#     browser.execute_script("window.scrollTo(0, document.body.scrollHeight)")
-#     tweets = browser.find_elements(By.XPATH, '//div[@data-testid="tweetText"]')
-#     for i in tweets:
-#         print(i.get_attribute('innerText'))      
-        
-#     time.sleep(SCROLL_PAUSE_TIME)
-#     new_height = browser.execute_script("return document.body.scrollHeight")
-#     if new_height == last_height:
-#         break
-#     last_height = new_height
-# browser.quit()
 # %%
