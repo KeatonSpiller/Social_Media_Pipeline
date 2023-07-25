@@ -6,6 +6,7 @@ import time
 
 # 2. Related third party imports.
 import pandas as pd 
+import numpy as np
 
 # *** Change Root Directory to top level folder ***
 top_level_folder = 'Social_Media_Pipeline'
@@ -29,6 +30,12 @@ from twitter_web_crawler_tools import load_users, parallel_extract_twitter
 
 if __name__ == '__main__':
     user_df = load_users()
-    parallel_extract_twitter(user_df, folder=f'./data/extracted/raw/twitter')
+    parallel_extract_twitter(user_df, 
+                             folder=f'./data/extracted/raw/twitter', 
+                             headless = True, 
+                             full_screen=False, 
+                             scroll_loops= 10, 
+                             howfar = '1970-01-01',
+                             debug=False)
 
 # %%

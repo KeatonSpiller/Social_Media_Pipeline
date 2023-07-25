@@ -43,9 +43,9 @@ def get_credentials():
 
 # %%
 # configure browser
-def configure_browser(headless=True, fullscreen=False, random_agent=False, w = 782, h=871, x=761, y=0):
-    
-    print("Setting Up Web Browser Configuration")
+def configure_browser(headless=True, fullscreen=False, random_agent=False, w = 782, h=871, x=761, y=0, debug=False):
+    if debug:
+        print("Setting Up Web Browser Configuration")
     options = webdriver.ChromeOptions()
     if(headless == True): # browser without GUI interface
         options.add_argument('--headless')
@@ -98,35 +98,46 @@ def load_users():
         f.close()
     return user_df
 
-def twitter_login(browser, email, password, phone):
+def twitter_login(browser, email, password, phone, debug):
     
     LOGIN_URL = 'https://www.twitter.com/login.php'
     browser.get(LOGIN_URL)
-    print("Logging Into Twitter")
+    if debug:
+        print("Logging Into Twitter")
     wait = WebDriverWait(browser, 30)
     try:
-        print("Email Login")
+        if debug:
+            print("Email Login")
         username_input = wait.until(EC.visibility_of_element_located((By.NAME, "text")))
         username_input.send_keys(str(email))
         wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@role='button'][contains(.,'Next')]"))).click()
     except Exception as e:
-        print("failed to login With Email")
+        if debug:
+            print("failed to login With Email")
+        pass
     try:
-        print("Phone Login")
+        if debug:
+            print("Phone Login")
         phone_input = WebDriverWait(browser, 4).until(EC.visibility_of_element_located((By.NAME, "text")))
         phone_input.send_keys(str(phone))
         phone_input.send_keys(Keys.RETURN)
     except exceptions.TimeoutException :
-        print("No phone Number Required")
+        if debug:
+            print("No phone Number Required")
+        pass
     try:
-        print("Password Login")
+        if debug:
+            print("Password Login")
         password_input = wait.until(EC.visibility_of_element_located((By.NAME, "password")))
         password_input.send_keys(str(password))
         password_input.send_keys(Keys.RETURN)
         time.sleep(4)
     except Exception as e:
-        print("failed to login With Password")
-    print("Done Logging In")
+        if debug:
+            print("failed to login With Password")
+        pass
+    if debug:
+        print("Done Logging In")
 
 def extend_df_text(df):
     
@@ -146,7 +157,7 @@ def extend_df_text(df):
         return df
 
 # %%            
-def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfar='2000-01-01' ):
+def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfar='1970-01-01', debug=False):
     
         metric_var = ['likes', 'views', 'Retweets', 'replies', 'like', 'view', 'Retweet', 'reply']
         posts = []
@@ -159,9 +170,11 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
         browser.get(f'https://www.twitter.com/{user}')
         try:
             user_name = WebDriverWait(browser, 20).until(EC.visibility_of_element_located((By.XPATH, '//div[@data-testid="UserName"]'))).get_attribute("innerText")
-            print(f'\nExtracting\n')
+            if debug:
+                print(f'\nExtracting\n')
         except Exception as e:
-            print(f"Incorrect username {user}")
+            if debug:
+                print(f"Incorrect username {user}")
             pass
         browser.execute_script(f"window.scrollTo(0, 0)") # 3 variations (scrollBy, scrolTo, scroll)
         for i in range(0, len(metric_var)):
@@ -196,6 +209,7 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
                         ids.append(int(last_child))
                 ## page_source = bs(browser.page_source,'lxml')
                 
+                # Getting Errors checking dimensions? Is this because of an empty variable?
                 def check_dimensions(variables):
                     dimensions = list(map(len,variables))
                     if len(set(dimensions)) == 1:
@@ -246,7 +260,8 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
                     
                     if(post[1] <= pd.to_datetime(howfar) ):
                         howfar_reached = True
-                        print("reached {howfar}\n")
+                        if debug:
+                            print("reached {howfar}\n")
                         break
                     
                     if(browser.execute_script(f"return window.scrollY") == browser.execute_script(f"return document.body.scrollHeight")):
@@ -260,7 +275,8 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
                 pass
             position = browser.execute_script(f"return window.scrollY")
             if( position == last_position ): # If we reached the end of scrolling access
-                print(position, last_position)
+                if debug:
+                    print(position, last_position)
                 continue_scrolling= False
                 break
         df = pd.DataFrame(data = posts, columns = ['id','created_at','url','likes','retweets','replies','views','emojis','text'])
@@ -271,25 +287,30 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
 def twitter_web_crawl(arg):
     
     # unpack tuple
-    user = arg[0]
-    group = arg[1]
-    folder = arg[2]
+    (user,group,folder,scroll_loops,headless,full_screen,howfar,debug) = arg
     email, password, phone = get_credentials()
     # Open Browser
-    browser = configure_browser(headless = False, 
-                                fullscreen=False, 
+    browser = configure_browser(headless = headless, 
+                                fullscreen=full_screen, 
                                 random_agent=False, 
                                 w = 782, h=871, 
-                                x=761, y=0)
+                                x=761, y=0, debug=debug)
     # Login to Twitter
     twitter_login(browser= browser, 
                   email= email, 
                   password= password, 
-                  phone = phone)
+                  phone = phone,
+                  debug=debug)
     # Extract twitter
     df = extract_twitter_user(browser=browser, 
                               user=user,
-                              howmany_loops=30).copy()
+                              howmany_loops=scroll_loops,
+                              howfar = howfar,
+                              debug=debug)
+
+    # Replace Values before Data Type conversion? 
+    # df.replace()
+    
     # Convert Column Data Types to this dictionary
     df_dtypes = {'id':         'int64',
                 'created_at': 'datetime64[ns, UTC]',
@@ -297,8 +318,8 @@ def twitter_web_crawl(arg):
                 'url':        'object',
                 'likes':      'int64',
                 'retweets':   'int64',
-                'replies':    'object',
-                'views':      'object',
+                'replies':    'int64',
+                'views':      'int64',
                 'emojis':     'object',
                 'hashtags':   'object',
                 'websites':   'object',
@@ -306,55 +327,58 @@ def twitter_web_crawl(arg):
                 'emoji_text': 'object'}
     # Extend dataframe
     df = extend_df_text(df).astype(df_dtypes)
-    # Export and Merge
-    # *********************************************** NOT WORKING ***********************************************
     file = f'{folder}{os.sep}{group}{os.sep}{user}.parquet'
-    if(os.path.exists(file)):
+    output = (df, folder, group, user, file, df_dtypes)
+    merge_and_export(output)
+
+# Export and Merge
+def merge_and_export(output):
+    (df, folder, group, user, file, df_dtypes) = output
+    if(os.path.exists(file)):# combine with previous file
         df_history = pd.read_parquet(path=file).reset_index(drop=True).astype(df_dtypes)
         if(len(df_history) > 0 ):
-            df_merge = pd.concat([df_history, df], how="outer", ignore_index=True).drop_duplicates(subset=['id'], keep='last').reset_index(drop=True)
+            df_merge = pd.concat([df_history, df], join="outer", ignore_index=True).drop_duplicates(subset=['id'], keep='last').reset_index(drop=True)
             df_merge.to_parquet(path=file,index=False)
-            print(df_merge.size)
-        else:
+            downloaded = len(df_merge) - len(df_history)
+            print(f'{group}: {user} -> {downloaded} new tweets downloaded, {len(df_merge)} tweets total', end='\n') 
+        else: # if file was deleted
             df.to_parquet(path=file,index=False)            
-        # print(f"{group}-{user}: {df_merge.size[0] - df_history.size[0]} extracted, {df_merge.size[0]} total")
-    else:
+    else: # first time downloading
         df.to_parquet(path=file,index=False)
-        # print(f"{group}-{user}:  {df_merge.size[0]} extracted for Initial download")
-        print(df_merge.size)
-    # merge_and_export(df.copy(), user, group, file)  
-       
-# def merge_and_export(df, user, group, file):
-
+        print(f'{group}: {user} -> {len(df)} new tweets downloaded', end='\n')
             
-def parallel_extract_twitter(user_df, folder=f'./data'):
+def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01', debug=False):
     """_summary_
     Args:  
     
     user_df (_type_): pandas.DataFrame()
     
-    |US_journals  | international_news  |
+    | US_journals | international_news  |
     |----------   |---------------------|
-    |0    WSJ	  |   ftworldnews       |
-    |1    CNN	  |   guardian          |
+    |0      WSJ   |   ftworldnews       |
+    |1      CNN   |   guardian          |
     |2		      |   FinancialTimes    |
     """
     cpu_count = multiprocessing.cpu_count() - 1 # max(cpu) minus 1 for core system processes 
-    p = multiprocessing.Pool(cpu_count)
-    
-    # folder to store Raw twitter downloads
-    if(not(os.path.exists(folder))):
+    p = multiprocessing.Pool(cpu_count) # p.apply_async, p.apply, p.map, p.starmap_async -> (# of arguments and returns)?
+    print(f"\nTwitter Data Extraction")
+    if(not(os.path.exists(folder))):# location to store Raw twitter downloads
         os.makedirs(folder)
     for group in user_df.columns:
-        print(f"\n***{group}***")
+        if debug:
+            print(f"\n***{group}***\n")
         group_folder = f'{folder}{os.sep}{group}'
-        if(not(os.path.exists(group_folder))):
+        if(not(os.path.exists(group_folder))): # Splitting Twitter downloads into groups per user
             os.makedirs(group_folder)
         users = list(user_df[group][user_df[group]!= ''])
         for user in users:
-            print(f"\n{user}:\n")
-            tup = (user,group,folder)
-            p.apply_async(twitter_web_crawl, args=(tup,))
+            if debug:
+                print(f"{user}", end=" ")
+            input = (user,group,folder,scroll_loops,headless,full_screen,howfar,debug)
+            if debug: # Synchronous debugging (try catch errors doesn't always work in async)
+                p.map(func=twitter_web_crawl, iterable=(input,))
+            else:
+                p.apply_async(func=twitter_web_crawl, args=(input,))
     p.close()
     p.join()
     
