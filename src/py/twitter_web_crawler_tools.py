@@ -346,7 +346,7 @@ def merge_and_export(output):
             df.to_parquet(path=file,index=False)            
     else: # first time downloading
         df.to_parquet(path=file,index=False)
-        print(f'{group}: {user} -> {len(df)} new tweets downloadeded', end='\n')
+        print(f'{group}: {user} -> {len(df)} new tweets downloaded', end='\n')
             
 def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01',sleep=4, debug=False):
     """_summary_
