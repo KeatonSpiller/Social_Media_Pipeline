@@ -31,11 +31,10 @@ from twitter_web_crawler_tools import load_users, parallel_extract_twitter
 if __name__ == '__main__':
     user_df = load_users()
     parallel_extract_twitter(user_df, 
-                             folder=f'./data/extracted/raw/twitter', 
+                             folder = f'./data/extracted/raw/twitter', 
                              headless = True, 
-                             full_screen=False, 
-                             scroll_loops= 10, 
+                             full_screen = False, 
+                             scroll_loops = np.Infinity, 
                              howfar = '1970-01-01',
-                             debug=False)
-
-# %%
+                             sleep = 4,
+                             debug = False)

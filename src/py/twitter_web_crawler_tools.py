@@ -157,7 +157,7 @@ def extend_df_text(df):
         return df
 
 # %%            
-def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfar='1970-01-01', debug=False):
+def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfar='1970-01-01', sleep= 4, debug=False):
     
         metric_var = ['likes', 'views', 'Retweets', 'replies', 'like', 'view', 'Retweet', 'reply']
         posts = []
@@ -192,7 +192,7 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
             try:
                 repetitive_scroll = 0
                 # How much to sleep to avoid breaking the program
-                time.sleep(2)
+                time.sleep(sleep)
                 # https://devhints.io/xpath
                 page_text = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, '//div[@data-testid="tweetText"]')))
                 page_timestamps = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, "//time")))
@@ -287,7 +287,7 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
 def twitter_web_crawl(arg):
     
     # unpack tuple
-    (user,group,folder,scroll_loops,headless,full_screen,howfar,debug) = arg
+    (user,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug) = arg
     email, password, phone = get_credentials()
     # Open Browser
     browser = configure_browser(headless = headless, 
@@ -306,6 +306,7 @@ def twitter_web_crawl(arg):
                               user=user,
                               howmany_loops=scroll_loops,
                               howfar = howfar,
+                              sleep=sleep,
                               debug=debug)
 
     # Replace Values before Data Type conversion? 
@@ -345,9 +346,9 @@ def merge_and_export(output):
             df.to_parquet(path=file,index=False)            
     else: # first time downloading
         df.to_parquet(path=file,index=False)
-        print(f'{group}: {user} -> {len(df)} new tweets downloaded', end='\n')
+        print(f'{group}: {user} -> {len(df)} new tweets downloadeded', end='\n')
             
-def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01', debug=False):
+def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01',sleep=4, debug=False):
     """_summary_
     Args:  
     
@@ -374,13 +375,37 @@ def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_sc
         for user in users:
             if debug:
                 print(f"{user}", end=" ")
-            input = (user,group,folder,scroll_loops,headless,full_screen,howfar,debug)
+            input = (user,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug)
             if debug: # Synchronous debugging (try catch errors doesn't always work in async)
                 p.map(func=twitter_web_crawl, iterable=(input,))
             else:
                 p.apply_async(func=twitter_web_crawl, args=(input,))
     p.close()
     p.join()
+    # log out of all sessions
+    log_out_sessions((headless,full_screen,debug))
+    
+def log_out_sessions(arg):
+    (headless,full_screen,debug) = arg
+    session_link = f'https://twitter.com/settings/sessions'
+    email, password, phone = get_credentials()
+    # Open Browser
+    browser = configure_browser(headless = headless, 
+                                fullscreen=full_screen, 
+                                random_agent=False, 
+                                w = 782, h=871, 
+                                x=761, y=0, debug=debug)
+    # Login to Twitter
+    twitter_login(browser= browser, 
+                    email= email, 
+                    password= password, 
+                    phone = phone,
+                    debug=debug)
+    # Open Session_link
+    browser.get(session_link)
+    # Click Logout and Confirm
+    browser.find_elements(By.XPATH, ("//*[@role = 'button']/child::*/child::*[self::span][contains(text(), 'Log out of all other sessions')]"))[0].click()
+    browser.find_elements(By.XPATH, ("//*[@data-testid = 'confirmationSheetConfirm']"))[0].click()
     
 class extract_from_text:
     
