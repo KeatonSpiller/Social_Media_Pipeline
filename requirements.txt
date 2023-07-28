@@ -22,7 +22,7 @@ yfinance >= 0.2.18 # financial stocks
 facebook-scraper == 0.2.59 # facebook
 facebook_sdk== 3.1.0 # facebook
 browser-cookie3 == 0.19.0
-selenium == 4.3.0 # linkedin | facebook
+selenium == 4.10.0 # linkedin | facebook | Twitter
 linkedin_scraper == 2.11.1 # linkedin
 webdriver_manager == 3.8.6
 

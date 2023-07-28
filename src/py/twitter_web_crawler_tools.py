@@ -6,10 +6,12 @@ import time
 import multiprocessing
 import advertools
 # 2. Related third party imports.
+import itertools
 import pandas as pd 
 import numpy as np 
 import glob
 import re 
+import json
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
@@ -17,8 +19,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common import action_chains
 from selenium.common import exceptions
 from fake_useragent import UserAgent
+# import browser_cookie3
 
 # *** Change Root Directory to top level folder ***
 top_level_folder = 'Social_Media_Pipeline'
@@ -41,52 +45,78 @@ def get_credentials():
     email, password, phone = credentials.email[0], credentials.password[0], credentials.phone[0]
     return email, password, phone
 
-# %%
 # configure browser
-def configure_browser(headless=True, fullscreen=False, random_agent=False, w = 782, h=871, x=761, y=0, debug=False):
+def configure_browser(headless=True, fullscreen=False, agent='standard', w = 782, h=871, x=761, y=0, debug=False, cookies= None):
+    
     if debug:
         print("Setting Up Web Browser Configuration")
     options = webdriver.ChromeOptions()
-    if(headless == True): # browser without GUI interface
+    # browser without GUI interface
+    if(headless == True): 
         options.add_argument('--headless')
-    if(random_agent==True): # Set Random Agent
-        pass
+    # Configure the Type of agent
+    if(agent=='random'): # Set Random Agent
         options.add_argument(f"user-agent={UserAgent().random}")
-    else: # Set User Agent
+    if(agent=='standard'): # Set Desktop Google Chrome
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)"+ "AppleWebKit/537.36 (KHTML, like Gecko)"+ "Chrome/114.0.0.0 Safari/537.36")
+    if(agent=='bot'): # Set Google Bot ( Disable login verification )
+        # "user-agent=Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) + AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/114.0.0.0 Safari/537.36")
+        # options.add_argument("user-agent=Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/114.0.0.0 Safari/537.36")
+        
+    # Disable Test Settings
     options.add_argument('--no-sandbox')
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument('--ignore-certificate-errors')
-    options.add_extension(f'./drivers/NoBufferCRX0.4.4.crx') # Stop video's from auto playing
+    # Disable Video Playback, and Images to speed up webpage
+    options.add_extension(f'./drivers/NoBuffer.crx') # Stop video's from auto playing
     options.add_argument('--blink-settings=imagesEnabled=false')
     options.add_argument('--disable-gpu')
+    # Remove Notifications
+    options.add_argument('--ignore-certificate-errors')
     options.add_argument("--disable-logging")
     options.add_argument("--log-level=3")
     options.add_argument("--disable-crash-reporter")
     options.add_argument('--disable-notifications')
     options.add_argument('--disable-popup-blocking')
+
     # remove password saving and geolocation
     prefs = {"profile.default_content_setting_values.geolocation" :2,
+             "profile.managed_default_content_settings.images": 2,
              "credentials_enable_service": False,
              "profile.password_manager_enabled": False}
     options.add_experimental_option("prefs", prefs)
-    # options.add_argument('--disable-blink-features=AutomationControlled')
+    # ***( Currently Not Working )***
+    # Remove Detection of Bots Automation
+    options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_experimental_option('useAutomationExtension', False)
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_argument("--disable-infobars")
+    options.add_argument("--kiosk")
     # remove DevTools listening
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
-    # hard coded chromedriver
+    # local chromedriver
     browser = webdriver.Chrome(service=Service(executable_path=f"./drivers/chromedriver.exe"), options=options, keep_alive=False)
-    # using chromedriver manager
+    # chromedriver manager
     # browser = webdriver.Chrome(service=ChromeDriverManager(chrome_type=ChromeType.GOOGLE, path = r"./drivers").install(), options=options, keep_alive=False)
-    # agent = browser.execute_script("return navigator.userAgent")
+    # Optimize Dimensions of Browser to fit size of monitor
     if(fullscreen == True):
         browser.maximize_window()
     else:
         browser.set_window_size(width=w, height=h) #{'width': 782, 'height': 871}
         browser.set_window_position(x=x, y=y) #{'x': 761, 'y': 0}
-    # window_dim = browser.get_window_rect()
-    # return broswer, window_dim, agent
+    # Reuse cookies with from another Browser's Setup
+    if(cookies != None):
+        print("Replacing cookies")
+        browser = add_all_cookies(browser, cookies)
+    # Zoom out to find more on page ( Note Currently Not displaying )
+    # ***( Currently Not Working )***
+    browser.execute_script("document.body.style.zoom='zoom 50%'")
+    
+    # open devtools
+    # action = action_chains.ActionChains(browser)
+    # action.send_keys(Keys.CONTROL+Keys.SHIFT+'j')
+    # time.sleep(10)
+        
     return browser
 
 def load_users():
@@ -155,8 +185,60 @@ def extend_df_text(df):
         column_to_move = df.pop("text")
         df.insert(2, "text", column_to_move)
         return df
+    
+def extract_elements_text(elements):
+                    
+    text,emoji_list = [],[]
+    for txt in elements:
+        text.append(txt.text.encode(encoding='utf-8').decode(encoding='utf-8'))
+        emoji_element = txt.find_elements(By.XPATH, "./child::*[self::img]")
+        emojis = ''
+        # Check for all emoji children of text
+        for e in emoji_element:
+            temp = e.get_attribute('alt')
+            if(temp is not None):
+                emojis = emojis + temp
+        emoji_list.append(emojis)
+        
+    return text, emoji_list
 
-# %%            
+def extract_elements_metrics(elements):
+                    
+    replies_list,retweets_list,likes_list,views_list = [],[],[],[]
+    for block in elements:
+        
+        replies,likes,views,retweets = 0,0,0,0
+        metric = block.get_attribute('aria-label')
+        metric_num = re.findall('[\d]+', metric)
+        metric_string = re.findall('[a-zA-Z]+', metric)
+        
+        for s,num in zip(metric_string, metric_num):
+            if(s == 'reply' or s =='replies'):
+                replies= num
+            if(s == 'Retweets' or s =='Retweet'):
+                retweets = num
+            if(s == 'like' or s =='likes'):
+                likes = num
+            if(s == 'views' or s =='view'):
+                views = num
+        replies_list.append(replies)
+        retweets_list.append(retweets)
+        likes_list.append(likes)
+        views_list.append(views)
+        
+    return replies_list,retweets_list,likes_list,views_list
+
+def extract_elements_links_id(elements):
+    urls, ids = [],[]
+    # remove duplicate external links
+    for link in elements:
+        href = link.get_attribute('href')
+        last_child = str(href.split('/')[-1])
+        if(len(last_child) >= len("1681508122635169792")):
+            urls.append(href)
+            ids.append(int(last_child))
+    return ids, urls      
+           
 def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfar='1970-01-01', sleep= 4, debug=False):
     
         metric_var = ['likes', 'views', 'Retweets', 'replies', 'like', 'view', 'Retweet', 'reply']
@@ -177,6 +259,13 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
                 print(f"Incorrect username {user}")
             pass
         browser.execute_script(f"window.scrollTo(0, 0)") # 3 variations (scrollBy, scrolTo, scroll)
+        
+        # Remove Login Blue Strip "Login" or "Don’t miss what’s happening"
+        blue_strip_top = browser.find_elements(By.XPATH, f"//*[@data-testid = 'TopNavBar']")
+        [browser.execute_script("arguments[0].remove()",child) for child in blue_strip_top]
+        blue_strip_bottom = browser.find_elements(By.XPATH, f"//*[@data-testid = 'BottomBar']")
+        [browser.execute_script("arguments[0].remove()",child) for child in blue_strip_bottom]
+        
         for i in range(0, len(metric_var)):
             for j in range(i+1, len(metric_var)-1):
                 if ( i != j):
@@ -189,84 +278,33 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
         while(continue_scrolling == True and repetitive_scroll <= 2 and howfar_reached == False and howmany_loops != scroll_count):
             scroll_count += 1
             last_position = browser.execute_script(f"return window.scrollY")
+            repetitive_scroll = 0
             try:
-                repetitive_scroll = 0
                 # How much to sleep to avoid breaking the program
                 time.sleep(sleep)
-                # https://devhints.io/xpath
-                page_text = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, '//div[@data-testid="tweetText"]')))
+                # XPATH HELP https://devhints.io/xpath
+                page_text = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, '//div[@data-testid="tweetText"][span]')))
                 page_timestamps = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, "//time")))
                 page_links = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, f"//a[contains(@href, '/{user}/status/')]")))
                 page_metrics = WebDriverWait(browser, 0.5).until(EC.presence_of_all_elements_located((By.XPATH, metric_conditional_string)))
-                links,ids = [],[]
-                
-                # remove duplicate external links
-                for link in page_links:
-                    href = link.get_attribute('href')
-                    last_child = str(href.split('/')[-1])
-                    if(len(last_child) >= len("1681508122635169792")):
-                        links.append(href)
-                        ids.append(int(last_child))
-                ## page_source = bs(browser.page_source,'lxml')
-                
-                # Getting Errors checking dimensions? Is this because of an empty variable?
-                def check_dimensions(variables):
-                    dimensions = list(map(len,variables))
-                    if len(set(dimensions)) == 1:
-                        return dimensions
-                    else:
-                        for i in range(1, dimensions):
-                            if( dimensions[0] - dimensions[i] > 1):
-                                print(f"Error in Dimensions Downloaded\n{dimensions}")
-                                break
-                        
-                # variables = (page_text,page_metrics,page_timestamps,ids,links)
-                # dimensions = check_dimensions(variables)
-                # print(dimensions)
-                
-                # initalize if metrics are empty
-                replies,likes,views,retweets = 0,0,0,0
-                post = []
-                for txt,metrics,ts,link,id in zip(page_text,page_metrics,page_timestamps,links,ids):
-                    
-                    text = txt.text.encode(encoding='utf-8').decode(encoding='utf-8')
-                    metric = metrics.get_attribute('aria-label')
-                    metric_num = re.findall('[\d]+', metric)
-                    metric_string = re.findall('[a-zA-Z]+', metric)
-                    created_at = pd.to_datetime(ts.get_attribute('datetime'))
-                    url = link
-                    emojis = ""
-                    # Check for all emoji children of text
-                    emoji_element = txt.find_elements(By.XPATH, "./child::*[self::img]")
-                    for e in emoji_element:
-                        temp = e.get_attribute('alt')
-                        if(temp is not None):
-                            emojis = emojis + temp
-                        
-                    for s,num in zip(metric_string, metric_num):
-                        if(s == 'reply' or s =='replies'):
-                            replies= num
-                        if(s == 'Retweets' or s =='Retweet'):
-                            retweets = num
-                        if(s == 'like' or s =='likes'):
-                            likes = num
-                        if(s == 'views' or s =='view'):
-                            views = num
-                    post = [id, created_at, url,
-                            likes, retweets, replies,
-                            views, emojis, text]
-                    if post not in posts:
-                        posts.append(post)
-                    
-                    if(post[1] <= pd.to_datetime(howfar) ):
-                        howfar_reached = True
-                        if debug:
-                            print("reached {howfar}\n")
-                        break
-                    
-                    if(browser.execute_script(f"return window.scrollY") == browser.execute_script(f"return document.body.scrollHeight")):
-                        time.sleep(4)
-                    browser.execute_script(f"window.scrollBy(0, 800)") # how far to scroll to find elements on screen
+     
+                # Iterate Individual element clusters (Note zip() gives duplicates if trying to iterate simultaneously on DOM)
+                ids, urls = extract_elements_links_id(page_links)
+                text, emojis = extract_elements_text(page_text)  
+                replies, retweets, likes, views = extract_elements_metrics(page_metrics)
+                created_at = [pd.to_datetime(ts.get_attribute('datetime')) for ts in page_timestamps]
+                post_block = list(zip(ids, created_at, urls, likes, retweets, replies, views, emojis, text))
+                posts.extend(post_block)
+                # If want tweets for a specific end Range
+                if(any(created_at <= pd.to_datetime(howfar)) ):
+                    howfar_reached = True
+                    if debug:
+                        print("reached {howfar}\n")
+                    break
+                # Give Time For the Page to Refresh Elements
+                if(browser.execute_script(f"return window.scrollY") == browser.execute_script(f"return document.body.scrollHeight")):
+                    time.sleep(4)
+                browser.execute_script(f"window.scrollBy(0, 800)") # how far to scroll to find elements on screen
         
             except Exception as e: # If there are not elements present on screen how far to scroll
                 time.sleep(0.25)
@@ -274,7 +312,7 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
                 repetitive_scroll +=1
                 pass
             position = browser.execute_script(f"return window.scrollY")
-            if( position == last_position ): # If we reached the end of scrolling access
+            if( position == last_position ): # If we reached the end of possible scrolling
                 if debug:
                     print(position, last_position)
                 continue_scrolling= False
@@ -287,20 +325,18 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
 def twitter_web_crawl(arg):
     
     # unpack tuple
-    (user,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug) = arg
-    email, password, phone = get_credentials()
+    (user,cookies,agent,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug) = arg
     # Open Browser
     browser = configure_browser(headless = headless, 
-                                fullscreen=full_screen, 
-                                random_agent=False, 
+                                fullscreen=full_screen,
+                                agent = agent,  
                                 w = 782, h=871, 
-                                x=761, y=0, debug=debug)
-    # Login to Twitter
-    twitter_login(browser= browser, 
-                  email= email, 
-                  password= password, 
-                  phone = phone,
-                  debug=debug)
+                                x=761, y=0,
+                                cookies=cookies,
+                                debug=debug)
+    # Login to Twitter(Deprecated and No Longer Required)
+    # email, password, phone = get_credentials()
+    # twitter_login(browser= browser, email= email, password= password, phone = phone, debug=debug)
     # Extract twitter
     df = extract_twitter_user(browser=browser, 
                               user=user,
@@ -308,9 +344,6 @@ def twitter_web_crawl(arg):
                               howfar = howfar,
                               sleep=sleep,
                               debug=debug)
-
-    # Replace Values before Data Type conversion? 
-    # df.replace()
     
     # Convert Column Data Types to this dictionary
     df_dtypes = {'id':         'int64',
@@ -348,7 +381,7 @@ def merge_and_export(output):
         df.to_parquet(path=file,index=False)
         print(f'{group}: {user} -> {len(df)} new tweets downloaded', end='\n')
             
-def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01',sleep=4, debug=False):
+def parallel_extract_twitter(user_df, folder=f'./data', agent='standard', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01',sleep=4, cookies=None, debug=False):
     """_summary_
     Args:  
     
@@ -365,6 +398,8 @@ def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_sc
     print(f"\nTwitter Data Extraction")
     if(not(os.path.exists(folder))):# location to store Raw twitter downloads
         os.makedirs(folder)
+    # find cookies of browser at a specifc webpage to pass into other browsers
+    # cookies = get_cookies_session(f'https://www.twitter.com')
     for group in user_df.columns:
         if debug:
             print(f"\n***{group}***\n")
@@ -375,24 +410,80 @@ def parallel_extract_twitter(user_df, folder=f'./data', headless = True, full_sc
         for user in users:
             if debug:
                 print(f"{user}", end=" ")
-            input = (user,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug)
+            input = (user,cookies,agent,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug)
+            
             if debug: # Synchronous debugging (try catch errors doesn't always work in async)
                 p.map(func=twitter_web_crawl, iterable=(input,))
             else:
                 p.apply_async(func=twitter_web_crawl, args=(input,))
     p.close()
     p.join()
-    # log out of all sessions
-    log_out_sessions((headless,full_screen,debug))
+    # log out of all sessions ( Deprecated: Login No Longer Required ) 
+    # log_out_sessions((headless,full_screen,agent,debug))
+    return
+    
+def read_write_cookies(url):
+    
+    cookies_folder = f'./credentials/cookies'
+    # reading and loading cookies from a json file
+    if not os.path.exists(cookies_folder):# If first time saving cookies
+        os.mkdir(cookies_folder)
+        email, password, phone = get_credentials()
+        browser = configure_browser(headless=False, fullscreen=False, 
+                                        agent='standard', w = 782, h=871, 
+                                        x=761, y=0, debug=False)
+        browser.get(url)
+        twitter_login(browser, email=email, password=password, phone=phone, debug=False)
+        cookies = browser.get_cookies()
+        time.sleep(8)
+        browser.close()
+        with open(cookies_folder+'/cookies', 'w') as fout:
+            json.dump(cookies, fout)
+    else: # If cookies are saved
+        with open(cookies_folder+'/cookies', 'r') as input:
+            cookies = json.load(input)
+    return cookies
+            
+def get_cookies_session(url):
+    
+    cookies_folder = f'./credentials/cookies'
+    if not os.path.exists(cookies_folder):
+        os.mkdir(cookies_folder)
+    email, password, phone = get_credentials()
+    browser = configure_browser(headless=True, fullscreen=False, 
+                                    agent='standard', w = 782, h=871, 
+                                    x=761, y=0, debug=False)
+    browser.get(url)
+    twitter_login(browser, email=email, password=password, phone=phone, debug=False)
+    browser.get(f'https://www.twitter.com/CNN') # Get Cookies from a timeline
+    cookies = browser.get_cookies()
+    browser.close()
+    
+    return cookies
+
+def add_all_cookies(browser, cookies):
+    
+    # browser.delete_all_cookies()
+    df = pd.DataFrame(cookies)
+    browser.delete_all_cookies()
+    for cookie in cookies:
+        print(cookie['name'])
+        print(type(cookie))
+        try:
+            browser.add_cookie(cookie)
+            print("Success", cookie)
+        except Exception:
+            print("ERROR", cookie)
+    return browser
     
 def log_out_sessions(arg):
-    (headless,full_screen,debug) = arg
+    (headless,full_screen,agent,debug) = arg
     session_link = f'https://twitter.com/settings/sessions'
     email, password, phone = get_credentials()
     # Open Browser
     browser = configure_browser(headless = headless, 
                                 fullscreen=full_screen, 
-                                random_agent=False, 
+                                agent= agent,
                                 w = 782, h=871, 
                                 x=761, y=0, debug=debug)
     # Login to Twitter
@@ -403,6 +494,7 @@ def log_out_sessions(arg):
                     debug=debug)
     # Open Session_link
     browser.get(session_link)
+    time.sleep(4)
     # Click Logout and Confirm
     browser.find_elements(By.XPATH, ("//*[@role = 'button']/child::*/child::*[self::span][contains(text(), 'Log out of all other sessions')]"))[0].click()
     browser.find_elements(By.XPATH, ("//*[@data-testid = 'confirmationSheetConfirm']"))[0].click()

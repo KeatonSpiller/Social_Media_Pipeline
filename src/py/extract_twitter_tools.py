@@ -78,12 +78,15 @@ def user_download_helper(api, userID, group, file, folder, display):
     #################################################
     if(oldest_id == None): 
         first_time_dowloading = True
+        # tweets = api.get_users_tweets(user_fields=userID, 
+        #                         max_results =100,
+        #                         exclude="replies|retweets",
+        #                         tweet_mode = 'extended')
         tweets = api.user_timeline(screen_name=userID, 
                                 count=200,
                                 include_rts = False,
                                 trim_user = False,
-                                tweet_mode = 'extended'
-                                )
+                                tweet_mode = 'extended')
         all_tweets.extend(tweets)
         
         oldest_id = tweets[-1].id
