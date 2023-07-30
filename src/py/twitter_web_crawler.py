@@ -30,14 +30,25 @@ from twitter_web_crawler_tools import load_users, parallel_extract_twitter
 
 if __name__ == '__main__':
     user_df = load_users()
-    
+    maximum = np.Infinity
+    document = 'document.documentElement.scrollHeight'
+    element = 'document.documentElement.scrollHeight'
+    client = 'document.documentElement.clientHeight'
+    offset = 'document.documentElement.offsetHeight'
+    body = 'return document.body.scrollHeight'
+    page = 800
+    midpage = 400
+    flow_login = 'https://twitter.com/i/flow/login' # standard: Google Chrome agent login
+    login = 'https://twitter.com/login' # bot: GoogleBot 2 Desktop agent
     parallel_extract_twitter(user_df, 
                              folder = f'./data/extracted/raw/twitter',
+                             login_url=login,
                              agent ='standard',
-                             headless = True, 
+                             headless = False, 
                              full_screen = False, 
-                             scroll_loops = np.Infinity, 
+                             scroll_loops = maximum, 
                              howfar = '1970-01-01',
-                             sleep = 2,
+                             scroll_by = page,
+                             sleep = 4,
                              cookies = None,
                              debug = False)

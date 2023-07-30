@@ -46,76 +46,76 @@ def get_credentials():
     return email, password, phone
 
 # configure browser
-def configure_browser(headless=True, fullscreen=False, agent='standard', w = 782, h=871, x=761, y=0, debug=False, cookies= None):
-    
+def configure_browser(headless=True, fullscreen=False, agent='standard', w = 782, h=871, x=761, y=0, debug=False):
+    options = webdriver.ChromeOptions()
+    # 'none', 'eager', 'normal'
+    options.page_load_strategy = 'eager'
     if debug:
         print("Setting Up Web Browser Configuration")
-    options = webdriver.ChromeOptions()
-    # browser without GUI interface
-    if(headless == True): 
+    # Hide Chrome Tab
+    if headless: 
         options.add_argument('--headless')
+    if fullscreen:
+        options.add_argument('--start-maximized')
+    # Disable Below
+    options.add_argument('--no-sandbox') # Running as root without --no-sandbox is not supported.
+    options.add_argument("--disable-dev-shm-usage") # No such file or directory Creating shared memory in /dev/shm/.org.chromium.Chromium.JwBSnH
+    # Videos
+    options.add_extension(f'./drivers/NoBuffer.crx') # Stop video's from auto playing
+    # Images
+    options.add_argument('--blink-settings=imagesEnabled=false')
+    options.add_argument('--disable-gpu=true')
+    # Notifications
+    options.add_argument('--ignore-certificate-errors')
+    # options.add_argument("--disable-logging")
+    options.add_argument("--log-level=3")
+    options.add_argument("--disable-crash-reporter")
+    options.add_argument('--disable-notifications')
+    options.add_argument('--disable-popup-blocking')
+    # Detection of Bots Automation
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    # options.add_argument("--disable-infobars")
+    options.add_argument("--kiosk") # printer mode
+    prefs = {"profile.default_content_setting_values.geolocation" :2, # remove Ask location
+             "profile.password_manager_enabled": False, # remove Ask password saving
+             "profile.managed_default_content_settings.images": 2, # remove images
+             "credentials_enable_service": False, # remove ask password
+             "useAutomationExtension": False
+             } 
+    options.add_experimental_option("prefs", prefs)
+    # options.add_experimental_option('useAutomationExtension', False)
+    # remove DevTools listening
+    options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation']) 
+    # remove "Chrome is  being controlled by automated test software"
+    # options.add_experimental_option("excludeSwitches", ['enable-automation'])
     # Configure the Type of agent
     if(agent=='random'): # Set Random Agent
         options.add_argument(f"user-agent={UserAgent().random}")
     if(agent=='standard'): # Set Desktop Google Chrome
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)"+ "AppleWebKit/537.36 (KHTML, like Gecko)"+ "Chrome/114.0.0.0 Safari/537.36")
-    if(agent=='bot'): # Set Google Bot ( Disable login verification )
-        # "user-agent=Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+    if(agent=='googlebot'): # Set Google Bot ( Disable login verification )
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) + AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/114.0.0.0 Safari/537.36")
-        # options.add_argument("user-agent=Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/114.0.0.0 Safari/537.36")
+    if(agent=='okhttp'):
+        options.add_argument("user-agent=okhttp/4.10.0")
+        # options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) + AppleWebKit/537.36 (KHTML, like Gecko; compatible; okhttp/4.10.0;) Chrome/114.0.0.0 Safari/537.36")
+    if(agent == 'yandex'):
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 YaBrowser/23.7.0.2564 Yowser/2.5 Safari/537.36")
+    if(agent == 'bingbot'):
+        options.add_argument("user-agent=Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/")
         
-    # Disable Test Settings
-    options.add_argument('--no-sandbox')
-    options.add_argument("--disable-dev-shm-usage")
-    # Disable Video Playback, and Images to speed up webpage
-    options.add_extension(f'./drivers/NoBuffer.crx') # Stop video's from auto playing
-    options.add_argument('--blink-settings=imagesEnabled=false')
-    options.add_argument('--disable-gpu')
-    # Remove Notifications
-    options.add_argument('--ignore-certificate-errors')
-    options.add_argument("--disable-logging")
-    options.add_argument("--log-level=3")
-    options.add_argument("--disable-crash-reporter")
-    options.add_argument('--disable-notifications')
-    options.add_argument('--disable-popup-blocking')
-
-    # remove password saving and geolocation
-    prefs = {"profile.default_content_setting_values.geolocation" :2,
-             "profile.managed_default_content_settings.images": 2,
-             "credentials_enable_service": False,
-             "profile.password_manager_enabled": False}
-    options.add_experimental_option("prefs", prefs)
-    # ***( Currently Not Working )***
-    # Remove Detection of Bots Automation
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_experimental_option('useAutomationExtension', False)
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_argument("--disable-infobars")
-    options.add_argument("--kiosk")
-    # remove DevTools listening
-    options.add_experimental_option('excludeSwitches', ['enable-logging'])
     # local chromedriver
     browser = webdriver.Chrome(service=Service(executable_path=f"./drivers/chromedriver.exe"), options=options, keep_alive=False)
     # chromedriver manager
     # browser = webdriver.Chrome(service=ChromeDriverManager(chrome_type=ChromeType.GOOGLE, path = r"./drivers").install(), options=options, keep_alive=False)
-    # Optimize Dimensions of Browser to fit size of monitor
     if(fullscreen == True):
         browser.maximize_window()
     else:
+        # half page
         browser.set_window_size(width=w, height=h) #{'width': 782, 'height': 871}
         browser.set_window_position(x=x, y=y) #{'x': 761, 'y': 0}
-    # Reuse cookies with from another Browser's Setup
-    if(cookies != None):
-        print("Replacing cookies")
-        browser = add_all_cookies(browser, cookies)
     # Zoom out to find more on page ( Note Currently Not displaying )
-    # ***( Currently Not Working )***
     browser.execute_script("document.body.style.zoom='zoom 50%'")
-    
-    # open devtools
-    # action = action_chains.ActionChains(browser)
-    # action.send_keys(Keys.CONTROL+Keys.SHIFT+'j')
-    # time.sleep(10)
+    browser.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
     return browser
 
@@ -128,10 +128,46 @@ def load_users():
         f.close()
     return user_df
 
-def twitter_login(browser, email, password, phone, debug):
+# def twitter_login_bot(browser, login_url, email, password, phone, agent, debug):
     
-    LOGIN_URL = 'https://www.twitter.com/login.php'
-    browser.get(LOGIN_URL)
+#     browser.get(login_url)
+#     if debug:
+#         print("Logging Into Twitter")
+#     wait = WebDriverWait(browser, 30)
+#     try:
+#         if debug:
+#             print("Email Login")
+#         username_input = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@type='email']")))
+#         username_input.send_keys(str(email))
+#     except Exception as e:
+#         if debug:
+#             print("failed to login With Email")
+#         pass
+#     try:
+#         if debug:
+#             print("Password Login")
+#         password_input = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@type='password']")))
+#         password_input.send_keys(str(password))
+#         password_input.send_keys(Keys.RETURN)
+#         time.sleep(4)
+#     except Exception as e:
+#         if debug:
+#             print("failed to login With Password")
+#         pass
+#     try:
+#         login_button = wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@role = 'button']")))
+#         login_button.send_keys(str(password))
+#         if debug:
+#             print("Done Logging In")
+#     except Exception as e:
+#         if debug:
+#             print("failed to click login button")
+#         pass
+        
+        
+def twitter_login(browser, login_url, email, password, phone, agent, debug):
+    
+    browser.get(login_url)
     if debug:
         print("Logging Into Twitter")
     wait = WebDriverWait(browser, 30)
@@ -239,7 +275,7 @@ def extract_elements_links_id(elements):
             ids.append(int(last_child))
     return ids, urls      
            
-def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfar='1970-01-01', sleep= 4, debug=False):
+def extract_twitter_user(browser, user='CNN', scroll_by= 800, howmany_loops = np.Infinity, howfar='1970-01-01', sleep= 4, debug=False):
     
         metric_var = ['likes', 'views', 'Retweets', 'replies', 'like', 'view', 'Retweet', 'reply']
         posts = []
@@ -303,48 +339,48 @@ def extract_twitter_user(browser, user='CNN', howmany_loops = np.Infinity, howfa
                     break
                 # Give Time For the Page to Refresh Elements
                 if(browser.execute_script(f"return window.scrollY") == browser.execute_script(f"return document.body.scrollHeight")):
-                    time.sleep(4)
-                browser.execute_script(f"window.scrollBy(0, 800)") # how far to scroll to find elements on screen
+                    time.sleep(sleep)
+                browser.execute_script(f"window.scrollBy(0, {scroll_by})") # how far to scroll to find elements on screen
         
             except Exception as e: # If there are not elements present on screen how far to scroll
-                time.sleep(0.25)
-                browser.execute_script(f"window.scrollBy(0, 400)")
+                time.sleep(sleep)
+                browser.execute_script(f"window.scrollBy(0, {scroll_by})")
                 repetitive_scroll +=1
                 pass
             position = browser.execute_script(f"return window.scrollY")
             if( position == last_position ): # If we reached the end of possible scrolling
                 if debug:
-                    print(position, last_position)
+                    print(f"Reached End of document: current position: {position}, last position: {last_position}")
                 continue_scrolling= False
                 break
         df = pd.DataFrame(data = posts, columns = ['id','created_at','url','likes','retweets','replies','views','emojis','text'])
         df = df.drop_duplicates(subset=['id'], keep='last').sort_values('created_at', ascending=False).reset_index(drop=True)
-        browser.close()
         return df
     
 def twitter_web_crawl(arg):
     
     # unpack tuple
-    (user,cookies,agent,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug) = arg
+    (user,login_url,cookies,agent,group,folder,scroll_loops,scroll_by,headless,full_screen,howfar,sleep,debug) = arg
     # Open Browser
     browser = configure_browser(headless = headless, 
                                 fullscreen=full_screen,
                                 agent = agent,  
                                 w = 782, h=871, 
                                 x=761, y=0,
-                                cookies=cookies,
                                 debug=debug)
-    # Login to Twitter(Deprecated and No Longer Required)
-    # email, password, phone = get_credentials()
-    # twitter_login(browser= browser, email= email, password= password, phone = phone, debug=debug)
+    browser.get(login_url)
+    add_all_cookies(browser=browser,
+                    cookies=cookies)
     # Extract twitter
     df = extract_twitter_user(browser=browser, 
                               user=user,
+                              scroll_by = scroll_by,
                               howmany_loops=scroll_loops,
                               howfar = howfar,
                               sleep=sleep,
                               debug=debug)
-    
+    print(user, len(df))
+    browser.close()
     # Convert Column Data Types to this dictionary
     df_dtypes = {'id':         'int64',
                 'created_at': 'datetime64[ns, UTC]',
@@ -381,7 +417,7 @@ def merge_and_export(output):
         df.to_parquet(path=file,index=False)
         print(f'{group}: {user} -> {len(df)} new tweets downloaded', end='\n')
             
-def parallel_extract_twitter(user_df, folder=f'./data', agent='standard', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01',sleep=4, cookies=None, debug=False):
+def parallel_extract_twitter(user_df, folder=f'./data', login_url='https://twitter.com/i/flow/login', agent='standard', headless = True, full_screen=False, scroll_loops = np.Infinity, howfar = '2000-01-01', scroll_by = 800, sleep=4, cookies=None, debug=False):
     """_summary_
     Args:  
     
@@ -399,7 +435,11 @@ def parallel_extract_twitter(user_df, folder=f'./data', agent='standard', headle
     if(not(os.path.exists(folder))):# location to store Raw twitter downloads
         os.makedirs(folder)
     # find cookies of browser at a specifc webpage to pass into other browsers
-    # cookies = get_cookies_session(f'https://www.twitter.com')
+    if cookies == None:
+        cookies = get_cookies_session(url= login_url, 
+                                    agent= agent,
+                                    debug=debug, 
+                                    headless=headless)
     for group in user_df.columns:
         if debug:
             print(f"\n***{group}***\n")
@@ -410,7 +450,7 @@ def parallel_extract_twitter(user_df, folder=f'./data', agent='standard', headle
         for user in users:
             if debug:
                 print(f"{user}", end=" ")
-            input = (user,cookies,agent,group,folder,scroll_loops,headless,full_screen,howfar,sleep,debug)
+            input = (user,login_url,cookies,agent,group,folder,scroll_loops,scroll_by,headless,full_screen,howfar,sleep,debug)
             
             if debug: # Synchronous debugging (try catch errors doesn't always work in async)
                 p.map(func=twitter_web_crawl, iterable=(input,))
@@ -419,24 +459,18 @@ def parallel_extract_twitter(user_df, folder=f'./data', agent='standard', headle
     p.close()
     p.join()
     # log out of all sessions ( Deprecated: Login No Longer Required ) 
-    # log_out_sessions((headless,full_screen,agent,debug))
+    # if( agent != 'bot'):
+    #     log_out_sessions((headless,full_screen,agent,debug))
     return
     
-def read_write_cookies(url):
+def read_write_cookies(url,browser):
     
     cookies_folder = f'./credentials/cookies'
     # reading and loading cookies from a json file
     if not os.path.exists(cookies_folder):# If first time saving cookies
         os.mkdir(cookies_folder)
-        email, password, phone = get_credentials()
-        browser = configure_browser(headless=False, fullscreen=False, 
-                                        agent='standard', w = 782, h=871, 
-                                        x=761, y=0, debug=False)
-        browser.get(url)
-        twitter_login(browser, email=email, password=password, phone=phone, debug=False)
         cookies = browser.get_cookies()
-        time.sleep(8)
-        browser.close()
+        # browser.close()
         with open(cookies_folder+'/cookies', 'w') as fout:
             json.dump(cookies, fout)
     else: # If cookies are saved
@@ -444,34 +478,36 @@ def read_write_cookies(url):
             cookies = json.load(input)
     return cookies
             
-def get_cookies_session(url):
-    
-    cookies_folder = f'./credentials/cookies'
-    if not os.path.exists(cookies_folder):
-        os.mkdir(cookies_folder)
+def get_cookies_session(url, agent, debug, headless):
+
+    browser = configure_browser(headless = headless, 
+                                fullscreen= False, 
+                                agent= agent,
+                                w = 782, h=871, 
+                                x=761, y=0, 
+                                debug=debug)
     email, password, phone = get_credentials()
-    browser = configure_browser(headless=True, fullscreen=False, 
-                                    agent='standard', w = 782, h=871, 
-                                    x=761, y=0, debug=False)
+    if agent != 'googlebot':
+        twitter_login(browser= browser,
+                    login_url = url,
+                    email= email,
+                    password= password,
+                    phone = phone,
+                    agent = agent,
+                    debug = debug)
     browser.get(url)
-    twitter_login(browser, email=email, password=password, phone=phone, debug=False)
-    browser.get(f'https://www.twitter.com/CNN') # Get Cookies from a timeline
     cookies = browser.get_cookies()
-    browser.close()
+    # browser.close()
     
     return cookies
 
 def add_all_cookies(browser, cookies):
     
+    # df = pd.DataFrame(cookies)
     # browser.delete_all_cookies()
-    df = pd.DataFrame(cookies)
-    browser.delete_all_cookies()
     for cookie in cookies:
-        print(cookie['name'])
-        print(type(cookie))
         try:
             browser.add_cookie(cookie)
-            print("Success", cookie)
         except Exception:
             print("ERROR", cookie)
     return browser
@@ -491,7 +527,8 @@ def log_out_sessions(arg):
                     email= email, 
                     password= password, 
                     phone = phone,
-                    debug=debug)
+                    agent = agent,
+                    debug = debug)
     # Open Session_link
     browser.get(session_link)
     time.sleep(4)
